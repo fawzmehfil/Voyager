@@ -1,0 +1,29 @@
+# Local planning notes
+*_TECHNICAL_PLAN.md
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+web/node_modules/
+web/dist/
+*.tsbuildinfo
+*.tsbuildinfo
+
+# Generated experiment outputs
+runs/*
+!runs/.gitkeep
+logs/
+checkpoints/
+*.ckpt
+
+# Local system files
+.DS_Store
