@@ -2,7 +2,7 @@
 
 Voyager is a Python-first multi-agent reinforcement learning environment for a stranded-island survival economy, paired with a web-based replay/demo layer. The project is inspired by the compact survival benchmark shape of Crafter: a small world, clear environment stepping, achievements, recorded runs, and behavior that can be inspected visually.
 
-Stage 3 implements the shared camp survival economy for the PettingZoo-style multi-agent environment. PPO, a recorder, Phaser rendering, and web replay are planned for later stages.
+Stage 4 adds reproducible baseline policies and evaluation for the multi-agent survival economy. PPO, a recorder, Phaser rendering, and web replay are planned for later stages.
 
 ## Why This Exists
 
@@ -49,8 +49,8 @@ The multi-agent environment supports seeded reset/step loops, roles, shared map 
 - Stage 0: Project skeleton.
 - Stage 1: Single-agent Crafter-style prototype.
 - Stage 2: Multi-agent environment.
-- Stage 3: Survival economy mechanics. Current.
-- Stage 4: Random, greedy, and cooperative baseline policies.
+- Stage 3: Survival economy mechanics.
+- Stage 4: Random, greedy, and cooperative baseline policies. Current.
 - Stage 5: TensorFlow PPO training.
 - Stage 6: Web replay viewer.
 - Stage 7: Notable runs page.
@@ -71,6 +71,7 @@ Basic checks:
 python -m compileall voyager examples
 python -c "import voyager; print(voyager.__version__)"
 python examples/random_rollout.py
+python examples/evaluate_baselines.py --episodes 1 --max-steps 100 --num-agents 5
 ```
 
 ## Frontend Setup
