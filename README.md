@@ -2,15 +2,15 @@
 
 Voyager is a Python-first multi-agent reinforcement learning environment for a stranded-island survival economy, paired with a web-based replay/demo layer. The project is inspired by the compact survival benchmark shape of Crafter: a small world, clear environment stepping, achievements, recorded runs, and behavior that can be inspected visually.
 
-Stage 0 is only the project skeleton. It does not implement map generation, agents, rewards, PPO, a recorder, or Phaser rendering yet.
+Stage 1 implements the first real single-agent Gymnasium environment. Multi-agent survival, PPO, a recorder, Phaser rendering, and web replay are planned for later stages.
 
 ## Why This Exists
 
 Voyager is meant to become an RL environment where agents learn to survive under scarcity. The first real environment will model agents stranded on an island with food, wood, stone, hunger, energy, shared camp storage, shelter construction, storms, and role specialization. The same runs should also be easy to showcase in a browser, with replay controls, agent panels, event timelines, and metrics.
 
-## Planned Python API
+## Python API
 
-Future Gymnasium-style single-agent prototype:
+Gymnasium-style single-agent prototype:
 
 ```python
 import gymnasium as gym
@@ -42,12 +42,12 @@ while env.agents:
     obs, rewards, terminations, truncations, infos = env.step(actions)
 ```
 
-These APIs are placeholders in Stage 0. Stage 1 will implement the first real environment.
+The PettingZoo-style multi-agent API is still planned for a later stage. `VoyagerSurvival-v0` intentionally remains a placeholder.
 
 ## Development Stages
 
 - Stage 0: Project skeleton.
-- Stage 1: Single-agent Crafter-style prototype.
+- Stage 1: Single-agent Crafter-style prototype. Current.
 - Stage 2: Multi-agent environment.
 - Stage 3: Survival economy mechanics.
 - Stage 4: Random, greedy, and cooperative baseline policies.
@@ -65,7 +65,7 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-Basic Stage 0 checks:
+Basic checks:
 
 ```bash
 python -m compileall voyager examples
