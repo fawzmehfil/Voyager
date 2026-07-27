@@ -36,6 +36,12 @@ class MultiAgentWorld:
         map_size: int,
         max_steps: int,
         inventory_capacity: int,
+        storm_start_step: int = 200,
+        storm_interval: int = 200,
+        storm_duration: int = 25,
+        storm_damage: float = 1.0,
+        food_regen_interval: int = 50,
+        food_spawn_rate: float = 0.04,
     ) -> None:
         if num_agents < 1:
             raise ValueError("num_agents must be at least 1.")
@@ -43,14 +49,26 @@ class MultiAgentWorld:
         self.map_size = map_size
         self.max_steps = max_steps
         self.inventory_capacity = inventory_capacity
+        self.storm_start_step = storm_start_step
+        self.storm_interval = storm_interval
+        self.storm_duration = storm_duration
+        self.storm_damage = storm_damage
+        self.food_regen_interval = food_regen_interval
+        self.food_spawn_rate = food_spawn_rate
         self.possible_agents = [f"agent_{index}" for index in range(num_agents)]
         self.state: MultiAgentWorldState | None = None
+        self.rng = np.random.default_rng()
 
     def reset(self, rng: np.random.Generator) -> MultiAgentWorldState:
         """Generate a fresh seeded shared island and spawn all agents."""
 
+        self.rng = rng
         single_state = generate_island(self.map_size, rng)
-        camp = CampState(x=single_state.agent.x, y=single_state.agent.y)
+        camp = CampState(
+            x=single_state.agent.x,
+            y=single_state.agent.y,
+            shelter_capacity=self.num_agents,
+        )
         spawns = self._spawn_positions(single_state.terrain, camp.x, camp.y)
         agents: dict[str, AgentState] = {}
         for index, agent_id in enumerate(self.possible_agents):
@@ -105,6 +123,19 @@ class MultiAgentWorld:
             elif action == Action.REST:
                 event, invalid, action_reward = self._rest(agent)
                 reward += action_reward
+            elif action in {
+                Action.DEPOSIT_FOOD,
+                Action.DEPOSIT_WOOD,
+                Action.DEPOSIT_STONE,
+            }:
+                event, invalid, action_reward = self._deposit(agent, action)
+                reward += action_reward
+            elif action == Action.WITHDRAW_FOOD:
+                event, invalid, action_reward = self._withdraw_food(agent)
+                reward += action_reward
+            elif action == Action.BUILD_SHELTER:
+                event, invalid, action_reward = self._build_shelter(agent)
+                reward += action_reward
             elif action == Action.NOOP:
                 event = "noop"
 
@@ -130,6 +161,9 @@ class MultiAgentWorld:
                 event=event,
             )
 
+        self._apply_storm_effects(results)
+        self._regenerate_food()
+        self._update_achievements()
         return results
 
     def alive_agents(self) -> list[str]:
@@ -150,6 +184,37 @@ class MultiAgentWorld:
             (agent.x, agent.y): agent_id
             for agent_id, agent in state.agents.items()
             if agent.alive
+        }
+
+    def is_storm_active(self) -> bool:
+        """Return whether a deterministic storm is active at the current step."""
+
+        state = self._require_state()
+        if state.step_count < self.storm_start_step:
+            return False
+        if self.storm_interval <= 0 or self.storm_duration <= 0:
+            return False
+        return ((state.step_count - self.storm_start_step) % self.storm_interval) < self.storm_duration
+
+    def metrics(self) -> dict[str, object]:
+        """Return JSON-like survival economy metrics."""
+
+        state = self._require_state()
+        return {
+            "step": state.step_count,
+            "active_agents": len(self.alive_agents()),
+            "deaths": state.deaths,
+            "camp": {
+                "position": (state.camp.x, state.camp.y),
+                "stockpile": dict(state.camp.stockpile),
+                "shelter_progress": state.camp.shelter_progress,
+                "shelter_capacity": state.camp.shelter_capacity,
+            },
+            "storm_active": self.is_storm_active(),
+            "achievements": sorted(state.achievements),
+            "total_deposits": state.total_deposits,
+            "total_withdrawals": state.total_withdrawals,
+            "total_build_actions": state.total_build_actions,
         }
 
     def _move(
@@ -221,10 +286,141 @@ class MultiAgentWorld:
         agent.energy = min(100.0, agent.energy + 10.0)
         return "rest", False, 0.05 if was_low_energy else 0.0
 
+    def _deposit(self, agent: AgentState, action: Action) -> tuple[str, bool, float]:
+        state = self._require_state()
+        if not self._at_camp(agent):
+            return "invalid_not_at_camp", True, 0.0
+
+        resource_name = {
+            Action.DEPOSIT_FOOD: "food",
+            Action.DEPOSIT_WOOD: "wood",
+            Action.DEPOSIT_STONE: "stone",
+        }[action]
+        if agent.inventory[resource_name] <= 0:
+            return f"invalid_no_{resource_name}", True, 0.0
+
+        agent.inventory[resource_name] -= 1
+        state.camp.stockpile[resource_name] += 1
+        state.total_deposits += 1
+        state.achievements.add("first_deposit")
+        return f"deposit_{resource_name}", False, 0.08
+
+    def _withdraw_food(self, agent: AgentState) -> tuple[str, bool, float]:
+        state = self._require_state()
+        if not self._at_camp(agent):
+            return "invalid_not_at_camp", True, 0.0
+        if state.camp.stockpile["food"] <= 0:
+            return "invalid_camp_no_food", True, 0.0
+        if agent.inventory["food"] >= self.inventory_capacity:
+            return "invalid_food_full", True, 0.0
+
+        state.camp.stockpile["food"] -= 1
+        agent.inventory["food"] += 1
+        state.total_withdrawals += 1
+        state.achievements.add("first_food_withdrawal")
+        return "withdraw_food", False, 0.04
+
+    def _build_shelter(self, agent: AgentState) -> tuple[str, bool, float]:
+        state = self._require_state()
+        if not self._at_camp(agent):
+            return "invalid_not_at_camp", True, 0.0
+        if state.camp.shelter_progress >= 1.0:
+            return "invalid_shelter_complete", True, 0.0
+
+        material = ""
+        if agent.inventory["wood"] > 0:
+            material = "wood"
+        elif agent.inventory["stone"] > 0:
+            material = "stone"
+        else:
+            return "invalid_no_build_material", True, 0.0
+
+        agent.inventory[material] -= 1
+        build_amount = 0.06 if agent.role == "builder" else 0.04
+        state.camp.shelter_progress = min(1.0, state.camp.shelter_progress + build_amount)
+        state.total_build_actions += 1
+        self._update_shelter_achievements()
+        return f"build_shelter_{material}", False, 0.15
+
     def _apply_survival_pressure(self, agent: AgentState) -> None:
         agent.hunger = min(100.0, agent.hunger + 0.35)
         if agent.hunger > 80.0:
             agent.health = max(0.0, agent.health - ((agent.hunger - 80.0) * 0.05))
+
+    def _apply_storm_effects(self, results: dict[str, AgentStepResult]) -> None:
+        state = self._require_state()
+        storm_active = self.is_storm_active()
+        if not storm_active:
+            if state.storm_was_active and self.alive_agents():
+                state.achievements.add("first_storm_survived")
+            state.storm_was_active = False
+            return
+
+        state.storm_was_active = True
+        damage = self.storm_damage * max(0.0, 1.0 - state.camp.shelter_progress)
+        if damage <= 0.0:
+            return
+
+        for agent_id in self.possible_agents:
+            agent = state.agents[agent_id]
+            if not agent.alive:
+                continue
+            agent.health = max(0.0, agent.health - damage)
+            if agent.health <= 0.0:
+                agent.alive = False
+                state.deaths += 1
+                if agent_id in results:
+                    previous = results[agent_id]
+                    results[agent_id] = AgentStepResult(
+                        reward=previous.reward - 10.0,
+                        terminated=True,
+                        truncated=previous.truncated,
+                        event="death",
+                    )
+
+    def _regenerate_food(self) -> None:
+        state = self._require_state()
+        if self.food_regen_interval <= 0:
+            return
+        if state.step_count == 0 or state.step_count % self.food_regen_interval != 0:
+            return
+
+        candidate_positions = np.argwhere(
+            ((state.terrain == Terrain.GRASS) | (state.terrain == Terrain.FOREST))
+            & (state.resource_quantities == 0)
+        )
+        if len(candidate_positions) == 0:
+            return
+
+        spawn_count = max(1, round(self.map_size * self.food_spawn_rate * 4))
+        selected_indexes = self.rng.choice(
+            len(candidate_positions),
+            size=min(spawn_count, len(candidate_positions)),
+            replace=False,
+        )
+        for index in np.atleast_1d(selected_indexes):
+            y, x = candidate_positions[int(index)]
+            state.resource_ids[y, x] = Resource.FOOD
+            state.resource_quantities[y, x] = 1
+
+    def _update_achievements(self) -> None:
+        state = self._require_state()
+        self._update_shelter_achievements()
+        if state.step_count >= 100 and state.deaths == 0:
+            state.achievements.add("all_active_agents_alive_100")
+
+    def _update_shelter_achievements(self) -> None:
+        state = self._require_state()
+        if state.camp.shelter_progress >= 0.25:
+            state.achievements.add("shelter_25_percent")
+        if state.camp.shelter_progress >= 0.50:
+            state.achievements.add("shelter_50_percent")
+        if state.camp.shelter_progress >= 1.0:
+            state.achievements.add("shelter_complete")
+
+    def _at_camp(self, agent: AgentState) -> bool:
+        state = self._require_state()
+        return (agent.x, agent.y) == (state.camp.x, state.camp.y)
 
     def _spawn_positions(
         self,

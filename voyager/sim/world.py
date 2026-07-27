@@ -68,6 +68,9 @@ class SingleAgentWorld:
             reward += rest_reward
         elif action == Action.NOOP:
             event = "noop"
+        else:
+            event = "invalid_unsupported_action"
+            invalid = True
 
         if invalid:
             reward -= 0.02

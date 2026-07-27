@@ -41,6 +41,11 @@ class Action(IntEnum):
     GATHER = 5
     EAT = 6
     REST = 7
+    DEPOSIT_FOOD = 8
+    DEPOSIT_WOOD = 9
+    DEPOSIT_STONE = 10
+    WITHDRAW_FOOD = 11
+    BUILD_SHELTER = 12
 
 
 ACTION_COUNT = len(Action)

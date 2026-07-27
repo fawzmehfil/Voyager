@@ -56,3 +56,8 @@ class MultiAgentWorldState:
     camp: CampState
     step_count: int = 0
     deaths: int = 0
+    achievements: set[str] = field(default_factory=set)
+    total_deposits: int = 0
+    total_withdrawals: int = 0
+    total_build_actions: int = 0
+    storm_was_active: bool = False

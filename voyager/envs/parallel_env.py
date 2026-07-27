@@ -23,6 +23,12 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
         max_steps: int = 1000,
         local_view_size: int = 7,
         inventory_capacity: int = 10,
+        storm_start_step: int = 200,
+        storm_interval: int = 200,
+        storm_duration: int = 25,
+        storm_damage: float = 1.0,
+        food_regen_interval: int = 50,
+        food_spawn_rate: float = 0.04,
         render_mode: str | None = None,
     ) -> None:
         if map_size < 9:
@@ -43,6 +49,12 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
             map_size=map_size,
             max_steps=max_steps,
             inventory_capacity=inventory_capacity,
+            storm_start_step=storm_start_step,
+            storm_interval=storm_interval,
+            storm_duration=storm_duration,
+            storm_damage=storm_damage,
+            food_regen_interval=food_regen_interval,
+            food_spawn_rate=food_spawn_rate,
         )
         self.possible_agents = list(self.world.possible_agents)
         self.agents: list[str] = []
@@ -156,6 +168,11 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
     def action_space(self, agent: str) -> spaces.Space:  # type: ignore[override]
         return self.action_spaces[agent]
 
+    def metrics(self) -> dict[str, object]:
+        """Return global survival economy metrics."""
+
+        return self.world.metrics()
+
     def _build_observation_space(self) -> spaces.Dict:
         return spaces.Dict(
             {
@@ -249,4 +266,6 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
                 "stockpile": dict(state.camp.stockpile),
                 "shelter_progress": state.camp.shelter_progress,
             },
+            "storm_active": self.world.is_storm_active(),
+            "achievements": sorted(state.achievements),
         }
