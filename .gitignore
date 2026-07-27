@@ -1,8 +1,10 @@
 # Local planning notes
 *_TECHNICAL_PLAN.md
+docs/
 
 # Python
 .venv/
+.venv*/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -22,6 +24,8 @@ runs/*
 logs/
 checkpoints/
 *.ckpt
+*.weights.h5
+*.keras
 
 # Local system files
 .DS_Store

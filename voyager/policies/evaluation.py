@@ -1,5 +1,6 @@
 """Evaluation helpers for Voyager baseline policies."""
 
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from numbers import Real
 from statistics import mean
@@ -7,6 +8,8 @@ from statistics import mean
 from voyager.envs import VoyagerParallelEnv
 from voyager.policies.base import Policy
 from voyager.policies.heuristics import CooperativePolicy, GreedySurvivalPolicy, RandomPolicy
+
+PolicyFactory = Callable[[int], Policy]
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,15 +75,18 @@ def evaluate_baselines(
     episodes: int = 3,
     max_steps: int = 300,
     num_agents: int = 10,
+    extra_policies: Sequence[tuple[str, PolicyFactory]] = (),
 ) -> list[EpisodeResult]:
     """Run all Stage 4 baselines over deterministic seeds."""
 
     results: list[EpisodeResult] = []
-    for policy_name, policy_factory in (
+    policy_specs: list[tuple[str, PolicyFactory]] = [
         ("random", lambda seed: RandomPolicy(seed=seed)),
         ("greedy", lambda _seed: GreedySurvivalPolicy()),
         ("cooperative", lambda _seed: CooperativePolicy()),
-    ):
+    ]
+    policy_specs.extend(extra_policies)
+    for policy_name, policy_factory in policy_specs:
         for seed in range(episodes):
             policy = policy_factory(seed)
             results.append(

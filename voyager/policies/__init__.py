@@ -2,6 +2,7 @@
 
 from voyager.policies.base import Info, Observation, Policy
 from voyager.policies.heuristics import CooperativePolicy, GreedySurvivalPolicy, RandomPolicy
+from voyager.policies.ppo_policy import TensorFlowPPOPolicy
 
 __all__ = [
     "CooperativePolicy",
@@ -10,4 +11,5 @@ __all__ = [
     "Observation",
     "Policy",
     "RandomPolicy",
+    "TensorFlowPPOPolicy",
 ]

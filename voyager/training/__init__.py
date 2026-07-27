@@ -1,1 +1,16 @@
-"""Training entrypoints and PPO utilities for future Voyager agents."""
+"""Training utilities for Voyager agents."""
+
+from voyager.training.advantages import compute_gae
+from voyager.training.obs import flat_observation_size, flatten_observation, flatten_observations
+from voyager.training.ppo import PPOConfig, PPOTrainer, PPOUpdateStats, RolloutBatch
+
+__all__ = [
+    "PPOConfig",
+    "PPOTrainer",
+    "PPOUpdateStats",
+    "RolloutBatch",
+    "compute_gae",
+    "flat_observation_size",
+    "flatten_observation",
+    "flatten_observations",
+]
