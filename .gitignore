@@ -9,13 +9,11 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 *.egg-info/
-*.egg-info/
 
 # Node / frontend
 node_modules/
 web/node_modules/
 web/dist/
-*.tsbuildinfo
 *.tsbuildinfo
 
 # Generated experiment outputs
