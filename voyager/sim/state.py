@@ -41,6 +41,7 @@ class CampState:
     stockpile: dict[str, int] = field(
         default_factory=lambda: {"food": 0, "wood": 0, "stone": 0}
     )
+    food_high_watermark: int = 0
     shelter_progress: float = 0.0
     shelter_capacity: int = 0
 

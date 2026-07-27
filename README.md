@@ -2,7 +2,7 @@
 
 Voyager is a Python-first multi-agent reinforcement learning environment for a stranded-island survival economy, paired with a web-based replay/demo layer. The project is inspired by the compact survival benchmark shape of Crafter: a small world, clear environment stepping, achievements, recorded runs, and behavior that can be inspected visually.
 
-Stage 5 adds shared-policy TensorFlow PPO training for the multi-agent survival economy. A recorder, Phaser rendering, and web replay are planned for later stages.
+Stage 5.5 strengthens shared-policy TensorFlow PPO with authoritative action masks, entropy decay, economy and group-survival reward shaping, and side-by-side deterministic/stochastic evaluation. A recorder, Phaser rendering, and web replay are planned for later stages.
 
 ## Why This Exists
 
@@ -42,7 +42,7 @@ while env.agents:
     obs, rewards, terminations, truncations, infos = env.step(actions)
 ```
 
-The multi-agent environment supports seeded reset/step loops, roles, shared map state, collision handling, camp deposits/withdrawals, shelter construction, deterministic storms, food regeneration, metrics, ANSI rendering, scripted baselines, and shared-policy PPO training.
+The multi-agent environment supports seeded reset/step loops, roles, shared map state, collision handling, camp deposits/withdrawals, shelter construction, deterministic storms, food regeneration, metrics, ANSI rendering, scripted baselines, and shared-policy PPO training. Each agent's `info["action_mask"]` identifies actions that are currently legal and useful.
 
 ## Development Stages
 
@@ -51,7 +51,8 @@ The multi-agent environment supports seeded reset/step loops, roles, shared map 
 - Stage 2: Multi-agent environment.
 - Stage 3: Survival economy mechanics.
 - Stage 4: Random, greedy, and cooperative baseline policies.
-- Stage 5: TensorFlow PPO training. Current.
+- Stage 5: TensorFlow PPO training.
+- Stage 5.5: Action masking, entropy decay, and economy/group reward shaping. Current.
 - Stage 6: Web replay viewer.
 - Stage 7: Notable runs page.
 - Stage 8: Optional LLM policy layer.
@@ -100,10 +101,12 @@ Run a more meaningful first experiment:
 
 ```bash
 python examples/train_ppo.py \
-  --total-steps 200000 \
+  --total-steps 1000000 \
   --rollout-steps 128 \
   --num-agents 10 \
   --max-steps 300 \
+  --entropy-coef-start 0.02 \
+  --entropy-coef-end 0.001 \
   --checkpoint-dir checkpoints/stage5
 ```
 
@@ -117,7 +120,9 @@ python examples/evaluate_baselines.py \
   --ppo-checkpoint checkpoints/stage5/latest
 ```
 
-`--total-steps` counts agent transitions, not only world ticks. With `10` agents and `128` rollout steps, one PPO update collects up to `1280` training samples.
+When a PPO checkpoint is provided, evaluation always prints separate `ppo_deterministic` and `ppo_stochastic` rows. The environment masks impossible or currently useless actions during training and inference, including empty gathers, eating without food, invalid camp transactions, and shelter building without material.
+
+`--total-steps` counts agent transitions, not only world ticks. With `10` agents and `128` rollout steps, one PPO update collects up to `1280` training samples. Entropy decays linearly across those agent transitions from `--entropy-coef-start` to `--entropy-coef-end`.
 
 ## Frontend Setup
 

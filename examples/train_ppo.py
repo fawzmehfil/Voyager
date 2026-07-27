@@ -20,7 +20,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--gae-lambda", type=float, default=0.95)
     parser.add_argument("--clip-ratio", type=float, default=0.2)
-    parser.add_argument("--entropy-coef", type=float, default=0.01)
+    parser.add_argument("--entropy-coef-start", type=float, default=0.02)
+    parser.add_argument("--entropy-coef-end", type=float, default=0.001)
+    parser.add_argument("--entropy-coef", type=float, default=None, help=argparse.SUPPRESS)
     parser.add_argument("--value-coef", type=float, default=0.5)
     parser.add_argument("--train-epochs", type=int, default=4)
     parser.add_argument("--minibatch-size", type=int, default=256)
@@ -48,7 +50,12 @@ def main() -> int:
         gamma=args.gamma,
         gae_lambda=args.gae_lambda,
         clip_ratio=args.clip_ratio,
-        entropy_coef=args.entropy_coef,
+        entropy_coef_start=(
+            args.entropy_coef if args.entropy_coef is not None else args.entropy_coef_start
+        ),
+        entropy_coef_end=(
+            args.entropy_coef if args.entropy_coef is not None else args.entropy_coef_end
+        ),
         value_coef=args.value_coef,
         train_epochs=args.train_epochs,
         minibatch_size=args.minibatch_size,
@@ -67,6 +74,7 @@ def main() -> int:
         "training shared-policy PPO "
         f"agent_steps={config.total_steps} agents={config.num_agents} "
         f"rollout_steps={config.rollout_steps} max_steps={config.max_steps}"
+        f" entropy={config.entropy_coef_start:.4f}->{config.entropy_coef_end:.4f}"
     )
     stats = trainer.train(on_update=_print_update)
     if config.checkpoint_dir is not None:
@@ -84,7 +92,8 @@ def _print_update(stats: PPOUpdateStats) -> None:
         f"return={stats.mean_return:+.4f} "
         f"policy_loss={stats.policy_loss:+.4f} "
         f"value_loss={stats.value_loss:.4f} "
-        f"entropy={stats.entropy:.4f}"
+        f"entropy={stats.entropy:.4f} "
+        f"entropy_coef={stats.entropy_coef:.5f}"
         f"{checkpoint}"
     )
 

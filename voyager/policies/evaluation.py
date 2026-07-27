@@ -101,6 +101,31 @@ def evaluate_baselines(
     return results
 
 
+def ppo_policy_specs(checkpoint_path: str) -> Sequence[tuple[str, PolicyFactory]]:
+    """Return both deterministic and stochastic PPO evaluation modes."""
+
+    from voyager.policies.ppo_policy import TensorFlowPPOPolicy
+
+    return (
+        (
+            "ppo_deterministic",
+            lambda seed: TensorFlowPPOPolicy(
+                checkpoint_path,
+                deterministic=True,
+                seed=seed,
+            ),
+        ),
+        (
+            "ppo_stochastic",
+            lambda seed: TensorFlowPPOPolicy(
+                checkpoint_path,
+                deterministic=False,
+                seed=seed,
+            ),
+        ),
+    )
+
+
 def print_summary(results: list[EpisodeResult]) -> None:
     """Print an aggregate table by policy."""
 
@@ -108,8 +133,9 @@ def print_summary(results: list[EpisodeResult]) -> None:
     for result in results:
         grouped.setdefault(result.policy, []).append(result)
 
+    policy_width = max([12, *(len(policy_name) for policy_name in grouped)])
     header = (
-        f"{'policy':<12} {'reward':>10} {'survivors':>10} {'deaths':>8} "
+        f"{'policy':<{policy_width}} {'reward':>10} {'survivors':>10} {'deaths':>8} "
         f"{'shelter':>9} {'camp_food':>10} {'achievements':>12}"
     )
     print(header)
@@ -117,7 +143,7 @@ def print_summary(results: list[EpisodeResult]) -> None:
     for policy_name in sorted(grouped):
         policy_results = grouped[policy_name]
         print(
-            f"{policy_name:<12} "
+            f"{policy_name:<{policy_width}} "
             f"{mean(result.total_reward for result in policy_results):>10.2f} "
             f"{mean(result.survivors for result in policy_results):>10.2f} "
             f"{mean(result.deaths for result in policy_results):>8.2f} "

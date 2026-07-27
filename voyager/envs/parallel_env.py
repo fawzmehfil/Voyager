@@ -109,7 +109,11 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
             for agent_id in acting_agents
         }
         infos = {
-            agent_id: self._info(agent_id, results[agent_id].event)
+            agent_id: self._info(
+                agent_id,
+                results[agent_id].event,
+                results[agent_id].reward_components,
+            )
             for agent_id in acting_agents
         }
 
@@ -172,6 +176,11 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
         """Return global survival economy metrics."""
 
         return self.world.metrics()
+
+    def action_mask(self, agent_id: str) -> np.ndarray:
+        """Return currently legal and useful actions for one agent."""
+
+        return self.world.action_mask(agent_id)
 
     def _build_observation_space(self) -> spaces.Dict:
         return spaces.Dict(
@@ -247,7 +256,12 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
             "progress": np.array([state.step_count / self.max_steps], dtype=np.float32),
         }
 
-    def _info(self, agent_id: str, event: str) -> dict[str, Any]:
+    def _info(
+        self,
+        agent_id: str,
+        event: str,
+        reward_components: dict[str, float] | None = None,
+    ) -> dict[str, Any]:
         state = self.world.state
         if state is None:
             return {"event": event}
@@ -268,4 +282,6 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
             },
             "storm_active": self.world.is_storm_active(),
             "achievements": sorted(state.achievements),
+            "action_mask": self.action_mask(agent_id),
+            "reward_components": dict(reward_components or {}),
         }

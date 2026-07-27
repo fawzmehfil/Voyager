@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from voyager.policies.evaluation import evaluate_baselines, print_summary
-from voyager.policies.ppo_policy import TensorFlowPPOPolicy
+from voyager.policies.evaluation import evaluate_baselines, ppo_policy_specs, print_summary
 
 
 def parse_args() -> argparse.Namespace:
@@ -22,7 +21,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--ppo-stochastic",
         action="store_true",
-        help="Sample PPO actions instead of taking the highest-logit action.",
+        help=argparse.SUPPRESS,
     )
     return parser.parse_args()
 
@@ -31,15 +30,7 @@ def main() -> int:
     args = parse_args()
     extra_policies = []
     if args.ppo_checkpoint is not None:
-        extra_policies.append(
-            (
-                "ppo",
-                lambda _seed: TensorFlowPPOPolicy(
-                    args.ppo_checkpoint,
-                    deterministic=not args.ppo_stochastic,
-                ),
-            )
-        )
+        extra_policies.extend(ppo_policy_specs(args.ppo_checkpoint))
     results = evaluate_baselines(
         episodes=args.episodes,
         max_steps=args.max_steps,

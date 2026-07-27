@@ -13,6 +13,7 @@ from voyager.envs import VoyagerParallelEnv
 from voyager.sim.constants import ACTION_COUNT
 from voyager.training.advantages import compute_gae
 from voyager.training.checkpoints import save_policy_checkpoint
+from voyager.training.masking import stack_action_masks
 from voyager.training.model import build_actor_critic, require_tensorflow
 from voyager.training.obs import flat_observation_size, flatten_observations
 
@@ -31,7 +32,8 @@ class PPOConfig:
     gamma: float = 0.99
     gae_lambda: float = 0.95
     clip_ratio: float = 0.2
-    entropy_coef: float = 0.01
+    entropy_coef_start: float = 0.02
+    entropy_coef_end: float = 0.001
     value_coef: float = 0.5
     train_epochs: int = 4
     minibatch_size: int = 256
@@ -62,8 +64,20 @@ class PPOConfig:
             raise ValueError("learning_rate must be positive.")
         if self.clip_ratio <= 0.0:
             raise ValueError("clip_ratio must be positive.")
+        if self.entropy_coef_start < 0.0 or self.entropy_coef_end < 0.0:
+            raise ValueError("entropy coefficients must be non-negative.")
+        if self.entropy_coef_start < self.entropy_coef_end:
+            raise ValueError("entropy_coef_start must be >= entropy_coef_end.")
         if not self.hidden_sizes:
             raise ValueError("hidden_sizes must not be empty.")
+
+    def entropy_coefficient(self, agent_steps: int) -> float:
+        """Return the linearly decayed entropy coefficient."""
+
+        progress = min(1.0, max(0.0, agent_steps / self.total_steps))
+        return self.entropy_coef_start + progress * (
+            self.entropy_coef_end - self.entropy_coef_start
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +85,7 @@ class RolloutBatch:
     """One PPO rollout flattened across all agents."""
 
     observations: np.ndarray
+    action_masks: np.ndarray
     actions: np.ndarray
     old_log_probs: np.ndarray
     values: np.ndarray
@@ -93,6 +108,7 @@ class PPOUpdateStats:
     policy_loss: float
     value_loss: float
     entropy: float
+    entropy_coef: float
     total_loss: float
     checkpoint_path: str | None
 
@@ -134,7 +150,12 @@ class PPOTrainer:
         while self.agent_steps < self.config.total_steps:
             update += 1
             batch = self.collect_rollout()
-            losses = self.update_policy(batch)
+            entropy_coef = (
+                self.config.entropy_coef_end
+                if self.agent_steps + int(batch.actions.shape[0]) >= self.config.total_steps
+                else self.config.entropy_coefficient(self.agent_steps)
+            )
+            losses = self.update_policy(batch, entropy_coef=entropy_coef)
             self.agent_steps += int(batch.actions.shape[0])
             checkpoint_path = self._maybe_save_checkpoint(update)
             update_stats = PPOUpdateStats(
@@ -145,6 +166,7 @@ class PPOTrainer:
                 policy_loss=losses["policy_loss"],
                 value_loss=losses["value_loss"],
                 entropy=losses["entropy"],
+                entropy_coef=entropy_coef,
                 total_loss=losses["total_loss"],
                 checkpoint_path=checkpoint_path,
             )
@@ -158,6 +180,7 @@ class PPOTrainer:
         """Collect one fixed-length rollout across all live agents."""
 
         obs_rows: list[np.ndarray] = []
+        action_mask_rows: list[np.ndarray] = []
         actions_rows: list[int] = []
         log_prob_rows: list[float] = []
         value_rows: list[float] = []
@@ -172,9 +195,11 @@ class PPOTrainer:
 
             agent_ids = tuple(self.env.agents)
             flat_obs = flatten_observations(self.observations, agent_ids)
+            action_masks = stack_action_masks(self.infos, agent_ids)
             logits, values = self.model(flat_obs, training=False)
-            actions = self._sample_actions(logits)
-            log_probs = self._selected_log_probs(logits, actions).numpy()
+            masked_logits = self._mask_logits(logits, action_masks)
+            actions = self._sample_actions(masked_logits)
+            log_probs = self._selected_log_probs(masked_logits, actions).numpy()
             values_np = np.squeeze(values.numpy(), axis=1).astype(np.float32)
 
             action_map = {
@@ -187,6 +212,7 @@ class PPOTrainer:
             for index, agent_id in enumerate(agent_ids):
                 done = bool(terminations[agent_id] or truncations[agent_id])
                 obs_rows.append(flat_obs[index])
+                action_mask_rows.append(action_masks[index])
                 actions_rows.append(int(actions[index]))
                 log_prob_rows.append(float(log_probs[index]))
                 value_rows.append(float(values_np[index]))
@@ -199,6 +225,7 @@ class PPOTrainer:
             self.infos.update(step_infos)
 
         observations = np.asarray(obs_rows, dtype=np.float32)
+        action_masks_array = np.asarray(action_mask_rows, dtype=np.bool_)
         actions_array = np.asarray(actions_rows, dtype=np.int32)
         old_log_probs = np.asarray(log_prob_rows, dtype=np.float32)
         values_array = np.asarray(value_rows, dtype=np.float32)
@@ -216,6 +243,7 @@ class PPOTrainer:
 
         return RolloutBatch(
             observations=observations,
+            action_masks=action_masks_array,
             actions=actions_array,
             old_log_probs=old_log_probs,
             values=values_array,
@@ -227,10 +255,16 @@ class PPOTrainer:
             agent_ids=tuple(agent_rows),
         )
 
-    def update_policy(self, batch: RolloutBatch) -> dict[str, float]:
+    def update_policy(
+        self,
+        batch: RolloutBatch,
+        entropy_coef: float | None = None,
+    ) -> dict[str, float]:
         """Apply PPO minibatch updates and return mean losses."""
 
         tf = self.tf
+        if entropy_coef is None:
+            entropy_coef = self.config.entropy_coefficient(self.agent_steps)
         sample_count = int(batch.actions.shape[0])
         indices = np.arange(sample_count)
         loss_rows: list[dict[str, float]] = []
@@ -240,6 +274,10 @@ class PPOTrainer:
             for start in range(0, sample_count, self.config.minibatch_size):
                 minibatch = indices[start : start + self.config.minibatch_size]
                 obs = tf.convert_to_tensor(batch.observations[minibatch], dtype=tf.float32)
+                action_masks = tf.convert_to_tensor(
+                    batch.action_masks[minibatch],
+                    dtype=tf.bool,
+                )
                 actions = tf.convert_to_tensor(batch.actions[minibatch], dtype=tf.int32)
                 old_log_probs = tf.convert_to_tensor(batch.old_log_probs[minibatch], dtype=tf.float32)
                 advantages = tf.convert_to_tensor(batch.advantages[minibatch], dtype=tf.float32)
@@ -247,8 +285,9 @@ class PPOTrainer:
 
                 with tf.GradientTape() as tape:
                     logits, values = self.model(obs, training=True)
+                    masked_logits = self._mask_logits(logits, action_masks)
                     values = tf.squeeze(values, axis=1)
-                    log_probs = self._selected_log_probs(logits, actions)
+                    log_probs = self._selected_log_probs(masked_logits, actions)
                     ratio = tf.exp(log_probs - old_log_probs)
                     unclipped = ratio * advantages
                     clipped = tf.clip_by_value(
@@ -258,11 +297,11 @@ class PPOTrainer:
                     ) * advantages
                     policy_loss = -tf.reduce_mean(tf.minimum(unclipped, clipped))
                     value_loss = tf.reduce_mean(tf.square(returns - values))
-                    entropy = self._entropy(logits)
+                    entropy = self._entropy(masked_logits)
                     total_loss = (
                         policy_loss
                         + self.config.value_coef * value_loss
-                        - self.config.entropy_coef * entropy
+                        - entropy_coef * entropy
                     )
 
                 gradients = tape.gradient(total_loss, self.model.trainable_variables)
@@ -311,6 +350,11 @@ class PPOTrainer:
     def _sample_actions(self, logits: Any) -> np.ndarray:
         actions = self.tf.random.categorical(logits, num_samples=1)
         return np.squeeze(actions.numpy(), axis=1).astype(np.int32)
+
+    def _mask_logits(self, logits: Any, action_masks: Any) -> Any:
+        masks = self.tf.cast(action_masks, self.tf.bool)
+        invalid_logits = self.tf.fill(self.tf.shape(logits), self.tf.cast(-1e9, logits.dtype))
+        return self.tf.where(masks, logits, invalid_logits)
 
     def _selected_log_probs(self, logits: Any, actions: Any) -> Any:
         action_mask = self.tf.one_hot(actions, depth=ACTION_COUNT)
@@ -362,6 +406,11 @@ class PPOTrainer:
             "num_agents": self.config.num_agents,
             "map_size": self.config.map_size,
             "max_steps": self.config.max_steps,
+            "action_masking": True,
+            "entropy_coef_start": self.config.entropy_coef_start,
+            "entropy_coef_end": self.config.entropy_coef_end,
+            "reward_version": "stage5.5_economy_group_v1",
+            "training_revision": "5.5",
         }
         latest = save_policy_checkpoint(self.model, root / "latest", metadata)
         if self.config.checkpoint_every > 0 and update % self.config.checkpoint_every == 0:

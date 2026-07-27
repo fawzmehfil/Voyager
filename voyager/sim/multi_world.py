@@ -1,10 +1,10 @@
-"""Multi-agent island world mechanics for Voyager Stage 2."""
+"""Multi-agent island world mechanics for Voyager."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
-from voyager.sim.constants import Action, Resource, Role, Terrain
+from voyager.sim.constants import ACTION_COUNT, Action, Resource, Role, Terrain
 from voyager.sim.mapgen import generate_island
 from voyager.sim.state import AgentState, CampState, MultiAgentWorldState
 from voyager.sim.world import RESOURCE_NAMES
@@ -25,6 +25,7 @@ class AgentStepResult:
     terminated: bool
     truncated: bool
     event: str
+    reward_components: dict[str, float] = field(default_factory=dict)
 
 
 class MultiAgentWorld:
@@ -89,6 +90,8 @@ class MultiAgentWorld:
         """Apply one stable-order simultaneous step for all currently living agents."""
 
         state = self._require_state()
+        previous_deaths = state.deaths
+        previous_shelter_progress = state.camp.shelter_progress
         state.step_count += 1
         occupied = {
             (agent.x, agent.y)
@@ -103,7 +106,13 @@ class MultiAgentWorld:
                 continue
 
             action = self._parse_action(actions.get(agent_id, Action.NOOP))
-            reward = 0.01
+            reward_components = {
+                "alive": 0.01,
+                "action": 0.0,
+                "invalid": 0.0,
+                "hunger_control": 0.0,
+                "death": 0.0,
+            }
             event = "noop"
             invalid = False
 
@@ -116,34 +125,34 @@ class MultiAgentWorld:
                 event, invalid = self._move(agent, action, occupied)
             elif action == Action.GATHER:
                 event, invalid, action_reward = self._gather(agent)
-                reward += action_reward
+                reward_components["action"] += action_reward
             elif action == Action.EAT:
                 event, invalid, action_reward = self._eat(agent)
-                reward += action_reward
+                reward_components["action"] += action_reward
             elif action == Action.REST:
                 event, invalid, action_reward = self._rest(agent)
-                reward += action_reward
+                reward_components["action"] += action_reward
             elif action in {
                 Action.DEPOSIT_FOOD,
                 Action.DEPOSIT_WOOD,
                 Action.DEPOSIT_STONE,
             }:
                 event, invalid, action_reward = self._deposit(agent, action)
-                reward += action_reward
+                reward_components["action"] += action_reward
             elif action == Action.WITHDRAW_FOOD:
                 event, invalid, action_reward = self._withdraw_food(agent)
-                reward += action_reward
+                reward_components["action"] += action_reward
             elif action == Action.BUILD_SHELTER:
                 event, invalid, action_reward = self._build_shelter(agent)
-                reward += action_reward
+                reward_components["action"] += action_reward
             elif action == Action.NOOP:
                 event = "noop"
 
             if invalid:
-                reward -= 0.02
+                reward_components["invalid"] = -0.05
 
             self._apply_survival_pressure(agent)
-            reward -= agent.hunger * 0.0005
+            reward_components["hunger_control"] = self._hunger_control_reward(agent.hunger)
 
             terminated = agent.health <= 0.0
             truncated = state.step_count >= self.max_steps
@@ -151,17 +160,23 @@ class MultiAgentWorld:
                 agent.alive = False
                 state.deaths += 1
                 occupied.discard((agent.x, agent.y))
-                reward -= 10.0
+                reward_components["death"] = -10.0
                 event = "death"
 
             results[agent_id] = AgentStepResult(
-                reward=float(reward),
+                reward=float(sum(reward_components.values())),
                 terminated=terminated,
                 truncated=truncated,
                 event=event,
+                reward_components=reward_components,
             )
 
         self._apply_storm_effects(results)
+        self._apply_group_rewards(
+            results=results,
+            previous_deaths=previous_deaths,
+            previous_shelter_progress=previous_shelter_progress,
+        )
         self._regenerate_food()
         self._update_achievements()
         return results
@@ -185,6 +200,70 @@ class MultiAgentWorld:
             for agent_id, agent in state.agents.items()
             if agent.alive
         }
+
+    def action_mask(self, agent_id: str) -> np.ndarray:
+        """Return currently legal and useful actions for one live agent."""
+
+        state = self._require_state()
+        if agent_id not in state.agents:
+            raise KeyError(f"Unknown agent: {agent_id}")
+
+        agent = state.agents[agent_id]
+        mask = np.zeros(ACTION_COUNT, dtype=np.int8)
+        mask[Action.NOOP] = 1
+        if not agent.alive:
+            return mask
+
+        occupied = set(self.occupied_positions())
+        for action in (
+            Action.MOVE_UP,
+            Action.MOVE_DOWN,
+            Action.MOVE_LEFT,
+            Action.MOVE_RIGHT,
+        ):
+            target_x, target_y = self._movement_target(agent, action)
+            if (
+                agent.energy >= 1.5
+                and self._in_bounds(target_x, target_y)
+                and state.terrain[target_y, target_x] != Terrain.WATER
+                and (target_x, target_y) not in occupied
+            ):
+                mask[action] = 1
+
+        resource = Resource(int(state.resource_ids[agent.y, agent.x]))
+        quantity = int(state.resource_quantities[agent.y, agent.x])
+        if resource != Resource.NONE and quantity > 0 and agent.energy >= 2.0:
+            resource_name = RESOURCE_NAMES[resource]
+            if agent.inventory[resource_name] < self.inventory_capacity:
+                mask[Action.GATHER] = 1
+
+        if agent.inventory["food"] > 0:
+            mask[Action.EAT] = 1
+        if agent.energy < 100.0:
+            mask[Action.REST] = 1
+
+        if self._at_camp(agent):
+            if agent.inventory["food"] > 0:
+                mask[Action.DEPOSIT_FOOD] = 1
+            if state.camp.shelter_progress < 1.0:
+                if agent.inventory["wood"] > 0:
+                    mask[Action.DEPOSIT_WOOD] = 1
+                if agent.inventory["stone"] > 0:
+                    mask[Action.DEPOSIT_STONE] = 1
+                if (
+                    agent.inventory["wood"] > 0
+                    or agent.inventory["stone"] > 0
+                    or state.camp.stockpile["wood"] > 0
+                    or state.camp.stockpile["stone"] > 0
+                ):
+                    mask[Action.BUILD_SHELTER] = 1
+            if (
+                state.camp.stockpile["food"] > 0
+                and agent.inventory["food"] < self.inventory_capacity
+            ):
+                mask[Action.WITHDRAW_FOOD] = 1
+
+        return mask
 
     def is_storm_active(self) -> bool:
         """Return whether a deterministic storm is active at the current step."""
@@ -223,14 +302,7 @@ class MultiAgentWorld:
         action: Action,
         occupied: set[tuple[int, int]],
     ) -> tuple[str, bool]:
-        dx, dy = {
-            Action.MOVE_UP: (0, -1),
-            Action.MOVE_DOWN: (0, 1),
-            Action.MOVE_LEFT: (-1, 0),
-            Action.MOVE_RIGHT: (1, 0),
-        }[action]
-        target_x = agent.x + dx
-        target_y = agent.y + dy
+        target_x, target_y = self._movement_target(agent, action)
 
         if agent.energy < 1.5:
             return "invalid_no_energy", True
@@ -303,7 +375,22 @@ class MultiAgentWorld:
         state.camp.stockpile[resource_name] += 1
         state.total_deposits += 1
         state.achievements.add("first_deposit")
-        return f"deposit_{resource_name}", False, 0.08
+        if resource_name == "food":
+            food_target = max(1, len(self.alive_agents()) * 2)
+            new_reserve = state.camp.stockpile["food"] > state.camp.food_high_watermark
+            state.camp.food_high_watermark = max(
+                state.camp.food_high_watermark,
+                state.camp.stockpile["food"],
+            )
+            if not new_reserve:
+                action_reward = 0.0
+            elif state.camp.stockpile["food"] <= food_target:
+                action_reward = 0.20
+            else:
+                action_reward = 0.08
+        else:
+            action_reward = 0.12 if state.camp.shelter_progress < 1.0 else 0.02
+        return f"deposit_{resource_name}", False, action_reward
 
     def _withdraw_food(self, agent: AgentState) -> tuple[str, bool, float]:
         state = self._require_state()
@@ -318,7 +405,7 @@ class MultiAgentWorld:
         agent.inventory["food"] += 1
         state.total_withdrawals += 1
         state.achievements.add("first_food_withdrawal")
-        return "withdraw_food", False, 0.04
+        return "withdraw_food", False, 0.0
 
     def _build_shelter(self, agent: AgentState) -> tuple[str, bool, float]:
         state = self._require_state()
@@ -328,24 +415,42 @@ class MultiAgentWorld:
             return "invalid_shelter_complete", True, 0.0
 
         material = ""
+        source = ""
         if agent.inventory["wood"] > 0:
             material = "wood"
+            source = "inventory"
         elif agent.inventory["stone"] > 0:
             material = "stone"
+            source = "inventory"
+        elif state.camp.stockpile["wood"] > 0:
+            material = "wood"
+            source = "camp"
+        elif state.camp.stockpile["stone"] > 0:
+            material = "stone"
+            source = "camp"
         else:
             return "invalid_no_build_material", True, 0.0
 
-        agent.inventory[material] -= 1
+        if source == "inventory":
+            agent.inventory[material] -= 1
+        else:
+            state.camp.stockpile[material] -= 1
         build_amount = 0.06 if agent.role == "builder" else 0.04
         state.camp.shelter_progress = min(1.0, state.camp.shelter_progress + build_amount)
         state.total_build_actions += 1
         self._update_shelter_achievements()
-        return f"build_shelter_{material}", False, 0.15
+        event = f"build_shelter_{material}" if source == "inventory" else f"build_shelter_camp_{material}"
+        return event, False, 0.15
 
     def _apply_survival_pressure(self, agent: AgentState) -> None:
         agent.hunger = min(100.0, agent.hunger + 0.35)
         if agent.hunger > 80.0:
             agent.health = max(0.0, agent.health - ((agent.hunger - 80.0) * 0.05))
+
+    def _hunger_control_reward(self, hunger: float) -> float:
+        if hunger <= 60.0:
+            return 0.01 * (1.0 - hunger / 60.0)
+        return -0.08 * ((hunger - 60.0) / 40.0)
 
     def _apply_storm_effects(self, results: dict[str, AgentStepResult]) -> None:
         state = self._require_state()
@@ -376,7 +481,38 @@ class MultiAgentWorld:
                         terminated=True,
                         truncated=previous.truncated,
                         event="death",
+                        reward_components={
+                            **previous.reward_components,
+                            "death": previous.reward_components.get("death", 0.0) - 10.0,
+                        },
                     )
+
+    def _apply_group_rewards(
+        self,
+        results: dict[str, AgentStepResult],
+        previous_deaths: int,
+        previous_shelter_progress: float,
+    ) -> None:
+        state = self._require_state()
+        alive_fraction = len(self.alive_agents()) / self.num_agents
+        food_per_survivor = state.camp.stockpile["food"] / max(1, len(self.alive_agents()))
+        shared_components = {
+            "group_survival": 0.01 * alive_fraction,
+            "food_security": 0.01 * min(1.0, food_per_survivor / 2.0),
+            "shelter_progress": 2.0
+            * max(0.0, state.camp.shelter_progress - previous_shelter_progress),
+            "team_death": -0.25 * max(0, state.deaths - previous_deaths),
+            "episode_survival": 1.0 * alive_fraction
+            if state.step_count >= self.max_steps
+            else 0.0,
+        }
+        shared_reward = sum(shared_components.values())
+        for agent_id, result in tuple(results.items()):
+            results[agent_id] = replace(
+                result,
+                reward=float(result.reward + shared_reward),
+                reward_components={**result.reward_components, **shared_components},
+            )
 
     def _regenerate_food(self) -> None:
         state = self._require_state()
@@ -448,6 +584,15 @@ class MultiAgentWorld:
             return Action(int(action))
         except ValueError:
             return Action.NOOP
+
+    def _movement_target(self, agent: AgentState, action: Action) -> tuple[int, int]:
+        dx, dy = {
+            Action.MOVE_UP: (0, -1),
+            Action.MOVE_DOWN: (0, 1),
+            Action.MOVE_LEFT: (-1, 0),
+            Action.MOVE_RIGHT: (1, 0),
+        }[action]
+        return agent.x + dx, agent.y + dy
 
     def _in_bounds(self, x: int, y: int) -> bool:
         return 0 <= x < self.map_size and 0 <= y < self.map_size
