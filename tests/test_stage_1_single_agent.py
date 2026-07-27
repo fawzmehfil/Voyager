@@ -4,7 +4,6 @@ from collections.abc import Iterator
 
 import gymnasium as gym
 import numpy as np
-import pytest
 
 import voyager
 from voyager.sim.constants import Action, Resource, Terrain
@@ -199,15 +198,6 @@ def test_ansi_render_returns_non_empty_string() -> None:
     assert isinstance(rendered, str)
     assert "health=" in rendered
     assert "@" in rendered
-    env.close()
-
-
-def test_multi_agent_survival_env_remains_placeholder() -> None:
-    env = gym.make("VoyagerSurvival-v0")
-
-    with pytest.raises(NotImplementedError, match="multi-agent stage"):
-        env.reset(seed=0)
-
     env.close()
 
 

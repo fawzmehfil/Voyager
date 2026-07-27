@@ -22,6 +22,14 @@ class Resource(IntEnum):
     STONE = 3
 
 
+class Role(IntEnum):
+    """Role identifiers for multi-agent observations."""
+
+    FORAGER = 0
+    WOODCUTTER = 1
+    BUILDER = 2
+
+
 class Action(IntEnum):
     """Discrete actions for the Stage 1 single-agent environment."""
 
@@ -36,3 +44,4 @@ class Action(IntEnum):
 
 
 ACTION_COUNT = len(Action)
+ROLE_COUNT = len(Role)
