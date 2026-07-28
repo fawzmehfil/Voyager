@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import platform
+import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
@@ -11,11 +14,20 @@ import numpy as np
 
 from voyager.envs import VoyagerParallelEnv
 from voyager.sim.constants import ACTION_COUNT
+from voyager.sim.rewards import DENSE_REWARD_COMPONENTS, REWARD_MODES, RewardMode
 from voyager.training.advantages import compute_gae
 from voyager.training.checkpoints import save_policy_checkpoint
 from voyager.training.masking import stack_action_masks
 from voyager.training.model import build_actor_critic, require_tensorflow
 from voyager.training.obs import flat_observation_size, flatten_observations
+from voyager.versions import (
+    ACHIEVEMENT_VERSION,
+    ACTION_VERSION,
+    DENSE_REWARD_VERSION,
+    ENVIRONMENT_VERSION,
+    OBSERVATION_VERSION,
+    SCENARIO_VERSION,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +52,10 @@ class PPOConfig:
     hidden_sizes: tuple[int, ...] = (128, 128)
     checkpoint_dir: str | None = "checkpoints/stage5"
     checkpoint_every: int = 10
+    reward_mode: RewardMode = "dense"
+    use_action_mask: bool = True
+    disabled_reward_components: tuple[str, ...] = ()
+    mask_role_observation: bool = False
 
     def validate(self) -> None:
         """Validate numeric config values before creating a trainer."""
@@ -70,6 +86,12 @@ class PPOConfig:
             raise ValueError("entropy_coef_start must be >= entropy_coef_end.")
         if not self.hidden_sizes:
             raise ValueError("hidden_sizes must not be empty.")
+        if self.reward_mode not in REWARD_MODES:
+            raise ValueError(f"Unsupported reward_mode: {self.reward_mode!r}.")
+        unknown_components = set(self.disabled_reward_components) - DENSE_REWARD_COMPONENTS
+        if unknown_components:
+            names = ", ".join(sorted(unknown_components))
+            raise ValueError(f"Unknown disabled reward components: {names}")
 
     def entropy_coefficient(self, agent_steps: int) -> float:
         """Return the linearly decayed entropy coefficient."""
@@ -125,6 +147,9 @@ class PPOTrainer:
             num_agents=config.num_agents,
             map_size=config.map_size,
             max_steps=config.max_steps,
+            reward_mode=config.reward_mode,
+            disabled_reward_components=config.disabled_reward_components,
+            mask_role_observation=config.mask_role_observation,
         )
         self.observations, self.infos = self.env.reset(seed=config.seed)
         self.reset_count = 1
@@ -138,6 +163,7 @@ class PPOTrainer:
         )
         self.optimizer = self.tf.keras.optimizers.Adam(learning_rate=config.learning_rate)
         self.agent_steps = 0
+        self.world_steps = 0
 
     def train(
         self,
@@ -196,6 +222,8 @@ class PPOTrainer:
             agent_ids = tuple(self.env.agents)
             flat_obs = flatten_observations(self.observations, agent_ids)
             action_masks = stack_action_masks(self.infos, agent_ids)
+            if not self.config.use_action_mask:
+                action_masks = np.ones_like(action_masks, dtype=np.bool_)
             logits, values = self.model(flat_obs, training=False)
             masked_logits = self._mask_logits(logits, action_masks)
             actions = self._sample_actions(masked_logits)
@@ -207,6 +235,7 @@ class PPOTrainer:
                 for index, agent_id in enumerate(agent_ids)
             }
             next_observations, rewards, terminations, truncations, step_infos = self.env.step(action_map)
+            self.world_steps += 1
             next_values_by_agent = self._next_values(next_observations)
 
             for index, agent_id in enumerate(agent_ids):
@@ -406,11 +435,37 @@ class PPOTrainer:
             "num_agents": self.config.num_agents,
             "map_size": self.config.map_size,
             "max_steps": self.config.max_steps,
-            "action_masking": True,
+            "rollout_steps": self.config.rollout_steps,
+            "world_steps": self.world_steps,
+            "environment_resets": self.reset_count,
+            "training_seed": self.config.seed,
+            "training_seed_last": self.config.seed + self.reset_count - 1,
+            "learning_rate": self.config.learning_rate,
+            "gamma": self.config.gamma,
+            "gae_lambda": self.config.gae_lambda,
+            "clip_ratio": self.config.clip_ratio,
+            "value_coef": self.config.value_coef,
+            "train_epochs": self.config.train_epochs,
+            "minibatch_size": self.config.minibatch_size,
+            "action_masking": self.config.use_action_mask,
             "entropy_coef_start": self.config.entropy_coef_start,
             "entropy_coef_end": self.config.entropy_coef_end,
-            "reward_version": "stage5.5_economy_group_v1",
-            "training_revision": "5.5",
+            "reward_mode": self.config.reward_mode,
+            "disabled_reward_components": list(self.config.disabled_reward_components),
+            "role_observation": not self.config.mask_role_observation,
+            "environment_version": ENVIRONMENT_VERSION,
+            "reward_version": DENSE_REWARD_VERSION,
+            "observation_version": OBSERVATION_VERSION,
+            "action_version": ACTION_VERSION,
+            "achievement_version": ACHIEVEMENT_VERSION,
+            "scenario_version": SCENARIO_VERSION,
+            "training_revision": "5.6",
+            "python_version": platform.python_version(),
+            "tensorflow_version": self.tf.__version__,
+            "numpy_version": version("numpy"),
+            "gymnasium_version": version("gymnasium"),
+            "pettingzoo_version": version("pettingzoo"),
+            "git_revision": _git_revision(),
         }
         latest = save_policy_checkpoint(self.model, root / "latest", metadata)
         if self.config.checkpoint_every > 0 and update % self.config.checkpoint_every == 0:
@@ -425,3 +480,17 @@ def _normalize_advantages(advantages: np.ndarray) -> np.ndarray:
     if std < 1e-8:
         return (advantages - float(np.mean(advantages))).astype(np.float32)
     return ((advantages - float(np.mean(advantages))) / (std + 1e-8)).astype(np.float32)
+
+
+def _git_revision() -> str:
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    return completed.stdout.strip() or "unknown"

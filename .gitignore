@@ -26,6 +26,10 @@ checkpoints/
 *.ckpt
 *.weights.h5
 *.keras
+!benchmarks/checkpoints/
+!benchmarks/checkpoints/**
+!benchmarks/checkpoints/**/model.weights.h5
+results/
 
 # Local system files
 .DS_Store

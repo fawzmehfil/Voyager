@@ -30,6 +30,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoint-dir", type=str, default="checkpoints/stage5")
     parser.add_argument("--checkpoint-every", type=int, default=10)
     parser.add_argument(
+        "--reward-mode",
+        choices=("dense", "achievement", "none"),
+        default="dense",
+    )
+    parser.add_argument(
+        "--no-action-mask",
+        action="store_true",
+        help="Disable authoritative action masks for an ablation run.",
+    )
+    parser.add_argument(
+        "--disable-reward-components",
+        nargs="*",
+        default=(),
+        metavar="NAME",
+        help="Dense reward component names to exclude during training.",
+    )
+    parser.add_argument(
+        "--zero-role-observation",
+        action="store_true",
+        help="Replace role one-hot observations with zeros for an ablation run.",
+    )
+    parser.add_argument(
         "--no-checkpoint",
         action="store_true",
         help="Run training without saving model checkpoints.",
@@ -62,6 +84,10 @@ def main() -> int:
         hidden_sizes=tuple(args.hidden_sizes),
         checkpoint_dir=None if args.no_checkpoint else args.checkpoint_dir,
         checkpoint_every=args.checkpoint_every,
+        reward_mode=args.reward_mode,
+        use_action_mask=not args.no_action_mask,
+        disabled_reward_components=tuple(args.disable_reward_components),
+        mask_role_observation=args.zero_role_observation,
     )
 
     try:

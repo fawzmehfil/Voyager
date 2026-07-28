@@ -1,0 +1,1665 @@
+{
+  "benchmark_id": "stage5_6_final_v1",
+  "bootstrap": {
+    "confidence": 0.95,
+    "samples": 10000,
+    "seed": 0
+  },
+  "episode_count": 900,
+  "policies": {
+    "cooperative": {
+      "achievements": {
+        "all_active_agents_alive_100": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "all_roles_contributed": {
+          "ci_high": 0.38,
+          "ci_low": 0.2,
+          "success_rate": 0.29
+        },
+        "camp_food_buffer_10": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "camp_food_buffer_20": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "first_deposit": {
+          "ci_high": 0.98,
+          "ci_low": 0.88,
+          "success_rate": 0.93
+        },
+        "first_food_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_food_withdrawal": {
+          "ci_high": 0.29,
+          "ci_low": 0.13,
+          "success_rate": 0.21
+        },
+        "first_stone_gathered": {
+          "ci_high": 0.86,
+          "ci_low": 0.7,
+          "success_rate": 0.78
+        },
+        "first_storm_survived": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_wood_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "food_security_100_steps": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "no_deaths_run": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "shared_food_transfer": {
+          "ci_high": 0.19,
+          "ci_low": 0.06,
+          "success_rate": 0.12
+        },
+        "shelter_25_percent": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "shelter_50_percent": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "shelter_complete": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        }
+      },
+      "civilization_score": {
+        "ci_high": 34.431885157448,
+        "ci_low": 31.648581983055216,
+        "mean": 33.02036948733104
+      },
+      "episodes": 100,
+      "metrics": {
+        "achievement_count": {
+          "ci_high": 6.55,
+          "ci_low": 6.12,
+          "mean": 6.33,
+          "std": 1.1196590390098067
+        },
+        "camp_food": {
+          "ci_high": 0.36,
+          "ci_low": 0.18,
+          "mean": 0.27,
+          "std": 0.4682872294787989
+        },
+        "deaths": {
+          "ci_high": 6.18,
+          "ci_low": 5.53,
+          "mean": 5.86,
+          "std": 1.6515679724663976
+        },
+        "dense_return": {
+          "ci_high": -191.22559927528965,
+          "ci_low": -205.52191521874227,
+          "mean": -198.53179632142098,
+          "std": 36.65791691565039
+        },
+        "invalid_probability_mass": {
+          "ci_high": 2865.33,
+          "ci_low": 2856.93975,
+          "mean": 2861.17,
+          "std": 21.264118304616517
+        },
+        "raw_invalid_actions": {
+          "ci_high": 2865.33,
+          "ci_low": 2856.93975,
+          "mean": 2861.17,
+          "std": 21.264118304616517
+        },
+        "selected_invalid_actions": {
+          "ci_high": 2865.33,
+          "ci_low": 2856.93975,
+          "mean": 2861.17,
+          "std": 21.264118304616517
+        },
+        "shelter_progress": {
+          "ci_high": 0.0642,
+          "ci_low": 0.04019999999999999,
+          "mean": 0.052199999999999996,
+          "std": 0.06188258677087235
+        },
+        "survival_rate": {
+          "ci_high": 0.4469999999999999,
+          "ci_low": 0.382,
+          "mean": 0.41400000000000003,
+          "std": 0.16515679724663976
+        },
+        "survivors": {
+          "ci_high": 4.47,
+          "ci_low": 3.82,
+          "mean": 4.14,
+          "std": 1.6515679724663976
+        }
+      }
+    },
+    "greedy": {
+      "achievements": {
+        "all_active_agents_alive_100": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "all_roles_contributed": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "camp_food_buffer_10": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "camp_food_buffer_20": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "first_deposit": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "first_food_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_food_withdrawal": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "first_stone_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_storm_survived": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_wood_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "food_security_100_steps": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "no_deaths_run": {
+          "ci_high": 0.16,
+          "ci_low": 0.04,
+          "success_rate": 0.1
+        },
+        "shared_food_transfer": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "shelter_25_percent": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "shelter_50_percent": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "shelter_complete": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        }
+      },
+      "civilization_score": {
+        "ci_high": 25.343119179413907,
+        "ci_low": 24.490570550363262,
+        "mean": 24.927749494659533
+      },
+      "episodes": 100,
+      "metrics": {
+        "achievement_count": {
+          "ci_high": 5.16,
+          "ci_low": 5.04,
+          "mean": 5.1,
+          "std": 0.30151134457776363
+        },
+        "camp_food": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "deaths": {
+          "ci_high": 2.15,
+          "ci_low": 1.66,
+          "mean": 1.9,
+          "std": 1.2350111437766564
+        },
+        "dense_return": {
+          "ci_high": -73.24436854166572,
+          "ci_low": -85.16977918124881,
+          "mean": -79.1419608333323,
+          "std": 30.587116126292766
+        },
+        "invalid_probability_mass": {
+          "ci_high": 2691.04025,
+          "ci_low": 2671.68,
+          "mean": 2682.06,
+          "std": 50.04095696264584
+        },
+        "raw_invalid_actions": {
+          "ci_high": 2691.04025,
+          "ci_low": 2671.68,
+          "mean": 2682.06,
+          "std": 50.04095696264584
+        },
+        "selected_invalid_actions": {
+          "ci_high": 2691.04025,
+          "ci_low": 2671.68,
+          "mean": 2682.06,
+          "std": 50.04095696264584
+        },
+        "shelter_progress": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "survival_rate": {
+          "ci_high": 0.8340000000000001,
+          "ci_low": 0.7850000000000001,
+          "mean": 0.8100000000000002,
+          "std": 0.12350111437766566
+        },
+        "survivors": {
+          "ci_high": 8.34,
+          "ci_low": 7.85,
+          "mean": 8.1,
+          "std": 1.2350111437766564
+        }
+      }
+    },
+    "ppo_seed0_deterministic": {
+      "achievements": {
+        "all_active_agents_alive_100": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "all_roles_contributed": {
+          "ci_high": 0.98,
+          "ci_low": 0.88,
+          "success_rate": 0.93
+        },
+        "camp_food_buffer_10": {
+          "ci_high": 0.96,
+          "ci_low": 0.85,
+          "success_rate": 0.91
+        },
+        "camp_food_buffer_20": {
+          "ci_high": 0.63,
+          "ci_low": 0.43,
+          "success_rate": 0.53
+        },
+        "first_deposit": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_food_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_food_withdrawal": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_stone_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_storm_survived": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_wood_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "food_security_100_steps": {
+          "ci_high": 0.81,
+          "ci_low": 0.63,
+          "success_rate": 0.72
+        },
+        "no_deaths_run": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shared_food_transfer": {
+          "ci_high": 0.95,
+          "ci_low": 0.83,
+          "success_rate": 0.89
+        },
+        "shelter_25_percent": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shelter_50_percent": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shelter_complete": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        }
+      },
+      "civilization_score": {
+        "ci_high": 94.79789696216056,
+        "ci_low": 91.34175950890875,
+        "mean": 93.15797528527816
+      },
+      "episodes": 100,
+      "metrics": {
+        "achievement_count": {
+          "ci_high": 15.22,
+          "ci_low": 14.73,
+          "mean": 14.98,
+          "std": 1.222516034473763
+        },
+        "camp_food": {
+          "ci_high": 20.73,
+          "ci_low": 16.519750000000002,
+          "mean": 18.58,
+          "std": 10.813553037412325
+        },
+        "deaths": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "dense_return": {
+          "ci_high": 178.1342896895737,
+          "ci_low": 174.83550504374244,
+          "mean": 176.4790555833245,
+          "std": 8.33470093662525
+        },
+        "invalid_probability_mass": {
+          "ci_high": 2718.063069128525,
+          "ci_low": 2712.0542929741905,
+          "mean": 2715.043751994497,
+          "std": 15.48315347264649
+        },
+        "raw_invalid_actions": {
+          "ci_high": 2719.39,
+          "ci_low": 2713.29,
+          "mean": 2716.34,
+          "std": 15.68130843850201
+        },
+        "selected_invalid_actions": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "shelter_progress": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "survival_rate": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "survivors": {
+          "ci_high": 10.0,
+          "ci_low": 10.0,
+          "mean": 10.0,
+          "std": 0.0
+        }
+      }
+    },
+    "ppo_seed0_stochastic": {
+      "achievements": {
+        "all_active_agents_alive_100": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "all_roles_contributed": {
+          "ci_high": 0.99,
+          "ci_low": 0.92,
+          "success_rate": 0.96
+        },
+        "camp_food_buffer_10": {
+          "ci_high": 1.0,
+          "ci_low": 0.93,
+          "success_rate": 0.97
+        },
+        "camp_food_buffer_20": {
+          "ci_high": 0.8,
+          "ci_low": 0.62,
+          "success_rate": 0.71
+        },
+        "first_deposit": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_food_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_food_withdrawal": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_stone_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_storm_survived": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_wood_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "food_security_100_steps": {
+          "ci_high": 0.91,
+          "ci_low": 0.77,
+          "success_rate": 0.84
+        },
+        "no_deaths_run": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shared_food_transfer": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shelter_25_percent": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shelter_50_percent": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shelter_complete": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        }
+      },
+      "civilization_score": {
+        "ci_high": 97.66740149363777,
+        "ci_low": 95.44032865719691,
+        "mean": 96.58755041962692
+      },
+      "episodes": 100,
+      "metrics": {
+        "achievement_count": {
+          "ci_high": 15.64,
+          "ci_low": 15.32,
+          "mean": 15.48,
+          "std": 0.8466213302106655
+        },
+        "camp_food": {
+          "ci_high": 24.93,
+          "ci_low": 20.77,
+          "mean": 22.82,
+          "std": 10.586230813102596
+        },
+        "deaths": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "dense_return": {
+          "ci_high": 182.65950412290417,
+          "ci_low": 179.3789269541564,
+          "mean": 181.05727499998872,
+          "std": 8.42751342786722
+        },
+        "invalid_probability_mass": {
+          "ci_high": 2710.819713844462,
+          "ci_low": 2704.8235745233214,
+          "mean": 2707.8622642757864,
+          "std": 15.4472057576767
+        },
+        "raw_invalid_actions": {
+          "ci_high": 2712.28,
+          "ci_low": 2706.3,
+          "mean": 2709.33,
+          "std": 15.482838332433845
+        },
+        "selected_invalid_actions": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "shelter_progress": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "survival_rate": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "survivors": {
+          "ci_high": 10.0,
+          "ci_low": 10.0,
+          "mean": 10.0,
+          "std": 0.0
+        }
+      }
+    },
+    "ppo_seed1_deterministic": {
+      "achievements": {
+        "all_active_agents_alive_100": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "all_roles_contributed": {
+          "ci_high": 0.88,
+          "ci_low": 0.73,
+          "success_rate": 0.81
+        },
+        "camp_food_buffer_10": {
+          "ci_high": 0.89,
+          "ci_low": 0.74,
+          "success_rate": 0.82
+        },
+        "camp_food_buffer_20": {
+          "ci_high": 0.56,
+          "ci_low": 0.36,
+          "success_rate": 0.46
+        },
+        "first_deposit": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_food_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_food_withdrawal": {
+          "ci_high": 0.98,
+          "ci_low": 0.89,
+          "success_rate": 0.94
+        },
+        "first_stone_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_storm_survived": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_wood_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "food_security_100_steps": {
+          "ci_high": 0.79,
+          "ci_low": 0.61,
+          "success_rate": 0.7
+        },
+        "no_deaths_run": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shared_food_transfer": {
+          "ci_high": 0.95,
+          "ci_low": 0.84,
+          "success_rate": 0.9
+        },
+        "shelter_25_percent": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shelter_50_percent": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shelter_complete": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        }
+      },
+      "civilization_score": {
+        "ci_high": 92.53227864017865,
+        "ci_low": 89.04180212720497,
+        "mean": 90.80420396153566
+      },
+      "episodes": 100,
+      "metrics": {
+        "achievement_count": {
+          "ci_high": 14.88,
+          "ci_low": 14.39,
+          "mean": 14.63,
+          "std": 1.2605514265550213
+        },
+        "camp_food": {
+          "ci_high": 18.87,
+          "ci_low": 14.84,
+          "mean": 16.82,
+          "std": 10.472069634233838
+        },
+        "deaths": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "dense_return": {
+          "ci_high": 177.89489330832262,
+          "ci_low": 174.13516284999224,
+          "mean": 176.02641566665756,
+          "std": 9.794294776858314
+        },
+        "invalid_probability_mass": {
+          "ci_high": 2756.5088743547035,
+          "ci_low": 2749.4534237695375,
+          "mean": 2753.0609274362632,
+          "std": 18.153700091273297
+        },
+        "raw_invalid_actions": {
+          "ci_high": 2747.38,
+          "ci_low": 2739.78,
+          "mean": 2743.67,
+          "std": 19.54846605881201
+        },
+        "selected_invalid_actions": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "shelter_progress": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "survival_rate": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "survivors": {
+          "ci_high": 10.0,
+          "ci_low": 10.0,
+          "mean": 10.0,
+          "std": 0.0
+        }
+      }
+    },
+    "ppo_seed1_stochastic": {
+      "achievements": {
+        "all_active_agents_alive_100": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "all_roles_contributed": {
+          "ci_high": 0.83,
+          "ci_low": 0.67,
+          "success_rate": 0.75
+        },
+        "camp_food_buffer_10": {
+          "ci_high": 0.75,
+          "ci_low": 0.57,
+          "success_rate": 0.66
+        },
+        "camp_food_buffer_20": {
+          "ci_high": 0.32,
+          "ci_low": 0.15,
+          "success_rate": 0.23
+        },
+        "first_deposit": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_food_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_food_withdrawal": {
+          "ci_high": 1.0,
+          "ci_low": 0.97,
+          "success_rate": 0.99
+        },
+        "first_stone_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_storm_survived": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_wood_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "food_security_100_steps": {
+          "ci_high": 0.6,
+          "ci_low": 0.4,
+          "success_rate": 0.5
+        },
+        "no_deaths_run": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shared_food_transfer": {
+          "ci_high": 0.97,
+          "ci_low": 0.86,
+          "success_rate": 0.92
+        },
+        "shelter_25_percent": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shelter_50_percent": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shelter_complete": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        }
+      },
+      "civilization_score": {
+        "ci_high": 88.24432992260869,
+        "ci_low": 84.16275686240698,
+        "mean": 86.25150814018203
+      },
+      "episodes": 100,
+      "metrics": {
+        "achievement_count": {
+          "ci_high": 14.310249999999996,
+          "ci_low": 13.78,
+          "mean": 14.05,
+          "std": 1.3660752600649848
+        },
+        "camp_food": {
+          "ci_high": 13.51,
+          "ci_low": 10.15,
+          "mean": 11.81,
+          "std": 8.473005262704502
+        },
+        "deaths": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "dense_return": {
+          "ci_high": 175.7409588791579,
+          "ci_low": 172.10472638332797,
+          "mean": 173.94794091665938,
+          "std": 9.262434445150115
+        },
+        "invalid_probability_mass": {
+          "ci_high": 2754.065402768104,
+          "ci_low": 2747.06088670388,
+          "mean": 2750.5914755435965,
+          "std": 17.889650752159437
+        },
+        "raw_invalid_actions": {
+          "ci_high": 2744.77,
+          "ci_low": 2737.09,
+          "mean": 2740.94,
+          "std": 19.591700984721758
+        },
+        "selected_invalid_actions": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "shelter_progress": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "survival_rate": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "survivors": {
+          "ci_high": 10.0,
+          "ci_low": 10.0,
+          "mean": 10.0,
+          "std": 0.0
+        }
+      }
+    },
+    "ppo_seed2_deterministic": {
+      "achievements": {
+        "all_active_agents_alive_100": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "all_roles_contributed": {
+          "ci_high": 0.84,
+          "ci_low": 0.67,
+          "success_rate": 0.76
+        },
+        "camp_food_buffer_10": {
+          "ci_high": 0.73,
+          "ci_low": 0.55,
+          "success_rate": 0.64
+        },
+        "camp_food_buffer_20": {
+          "ci_high": 0.26,
+          "ci_low": 0.11,
+          "success_rate": 0.18
+        },
+        "first_deposit": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_food_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_food_withdrawal": {
+          "ci_high": 1.0,
+          "ci_low": 0.97,
+          "success_rate": 0.99
+        },
+        "first_stone_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_storm_survived": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_wood_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "food_security_100_steps": {
+          "ci_high": 0.35,
+          "ci_low": 0.18,
+          "success_rate": 0.26
+        },
+        "no_deaths_run": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shared_food_transfer": {
+          "ci_high": 0.98,
+          "ci_low": 0.88,
+          "success_rate": 0.93
+        },
+        "shelter_25_percent": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shelter_50_percent": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shelter_complete": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        }
+      },
+      "civilization_score": {
+        "ci_high": 85.91009981223345,
+        "ci_low": 81.58925925509432,
+        "mean": 83.74158701397566
+      },
+      "episodes": 100,
+      "metrics": {
+        "achievement_count": {
+          "ci_high": 14.04,
+          "ci_low": 13.49,
+          "mean": 13.76,
+          "std": 1.3862237054733126
+        },
+        "camp_food": {
+          "ci_high": 1.17,
+          "ci_low": 0.17,
+          "mean": 0.6,
+          "std": 2.593698657761292
+        },
+        "deaths": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "dense_return": {
+          "ci_high": 168.8407708479115,
+          "ci_low": 164.9451244770792,
+          "mean": 166.9021951666617,
+          "std": 9.882208022134858
+        },
+        "invalid_probability_mass": {
+          "ci_high": 2715.4089709949976,
+          "ci_low": 2709.5311771824922,
+          "mean": 2712.545406662285,
+          "std": 15.242486458495124
+        },
+        "raw_invalid_actions": {
+          "ci_high": 2715.96,
+          "ci_low": 2709.95,
+          "mean": 2713.05,
+          "std": 15.58383972601299
+        },
+        "selected_invalid_actions": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "shelter_progress": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "survival_rate": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "survivors": {
+          "ci_high": 10.0,
+          "ci_low": 10.0,
+          "mean": 10.0,
+          "std": 0.0
+        }
+      }
+    },
+    "ppo_seed2_stochastic": {
+      "achievements": {
+        "all_active_agents_alive_100": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "all_roles_contributed": {
+          "ci_high": 0.89,
+          "ci_low": 0.74,
+          "success_rate": 0.82
+        },
+        "camp_food_buffer_10": {
+          "ci_high": 0.65,
+          "ci_low": 0.45,
+          "success_rate": 0.55
+        },
+        "camp_food_buffer_20": {
+          "ci_high": 0.25,
+          "ci_low": 0.1,
+          "success_rate": 0.17
+        },
+        "first_deposit": {
+          "ci_high": 0.99,
+          "ci_low": 0.92,
+          "success_rate": 0.96
+        },
+        "first_food_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_food_withdrawal": {
+          "ci_high": 0.99,
+          "ci_low": 0.9,
+          "success_rate": 0.95
+        },
+        "first_stone_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_storm_survived": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_wood_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "food_security_100_steps": {
+          "ci_high": 0.4,
+          "ci_low": 0.22,
+          "success_rate": 0.31
+        },
+        "no_deaths_run": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shared_food_transfer": {
+          "ci_high": 0.97,
+          "ci_low": 0.86,
+          "success_rate": 0.92
+        },
+        "shelter_25_percent": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "shelter_50_percent": {
+          "ci_high": 1.0,
+          "ci_low": 0.97,
+          "success_rate": 0.99
+        },
+        "shelter_complete": {
+          "ci_high": 1.0,
+          "ci_low": 0.97,
+          "success_rate": 0.99
+        }
+      },
+      "civilization_score": {
+        "ci_high": 85.56070544943556,
+        "ci_low": 80.63611393017709,
+        "mean": 83.18842019393392
+      },
+      "episodes": 100,
+      "metrics": {
+        "achievement_count": {
+          "ci_high": 13.98,
+          "ci_low": 13.32,
+          "mean": 13.66,
+          "std": 1.658890952389334
+        },
+        "camp_food": {
+          "ci_high": 3.92,
+          "ci_low": 1.63,
+          "mean": 2.7,
+          "std": 5.828352852195633
+        },
+        "deaths": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "dense_return": {
+          "ci_high": 169.14473250624377,
+          "ci_low": 165.69360212291227,
+          "mean": 167.44785441666124,
+          "std": 8.735887764640523
+        },
+        "invalid_probability_mass": {
+          "ci_high": 2714.0826932350815,
+          "ci_low": 2708.023616378352,
+          "mean": 2711.0155363320264,
+          "std": 15.711404699128737
+        },
+        "raw_invalid_actions": {
+          "ci_high": 2714.20025,
+          "ci_low": 2708.03,
+          "mean": 2711.07,
+          "std": 15.907723173529787
+        },
+        "selected_invalid_actions": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "shelter_progress": {
+          "ci_high": 1.0,
+          "ci_low": 0.9819999999999999,
+          "mean": 0.9940000000000001,
+          "std": 0.060000000000000005
+        },
+        "survival_rate": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "mean": 1.0,
+          "std": 0.0
+        },
+        "survivors": {
+          "ci_high": 10.0,
+          "ci_low": 10.0,
+          "mean": 10.0,
+          "std": 0.0
+        }
+      }
+    },
+    "random": {
+      "achievements": {
+        "all_active_agents_alive_100": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "all_roles_contributed": {
+          "ci_high": 0.08,
+          "ci_low": 0.01,
+          "success_rate": 0.04
+        },
+        "camp_food_buffer_10": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "camp_food_buffer_20": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "first_deposit": {
+          "ci_high": 0.72,
+          "ci_low": 0.53,
+          "success_rate": 0.63
+        },
+        "first_food_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_food_withdrawal": {
+          "ci_high": 0.08,
+          "ci_low": 0.01,
+          "success_rate": 0.04
+        },
+        "first_stone_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_storm_survived": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "first_wood_gathered": {
+          "ci_high": 1.0,
+          "ci_low": 1.0,
+          "success_rate": 1.0
+        },
+        "food_security_100_steps": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "no_deaths_run": {
+          "ci_high": 0.14,
+          "ci_low": 0.03,
+          "success_rate": 0.08
+        },
+        "shared_food_transfer": {
+          "ci_high": 0.05,
+          "ci_low": 0.0,
+          "success_rate": 0.02
+        },
+        "shelter_25_percent": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "shelter_50_percent": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        },
+        "shelter_complete": {
+          "ci_high": 0.0,
+          "ci_low": 0.0,
+          "success_rate": 0.0
+        }
+      },
+      "civilization_score": {
+        "ci_high": 30.453283944338672,
+        "ci_low": 28.52522449570502,
+        "mean": 29.446186855651092
+      },
+      "episodes": 100,
+      "metrics": {
+        "achievement_count": {
+          "ci_high": 5.96,
+          "ci_low": 5.67,
+          "mean": 5.81,
+          "std": 0.7613783354528613
+        },
+        "camp_food": {
+          "ci_high": 0.12,
+          "ci_low": 0.01,
+          "mean": 0.06,
+          "std": 0.2777979790634143
+        },
+        "deaths": {
+          "ci_high": 2.41,
+          "ci_low": 1.88,
+          "mean": 2.14,
+          "std": 1.3410383433682418
+        },
+        "dense_return": {
+          "ci_high": -44.97892457291628,
+          "ci_low": -57.1657905562495,
+          "mean": -50.957532305555034,
+          "std": 31.41642835235413
+        },
+        "invalid_probability_mass": {
+          "ci_high": 1620.78025,
+          "ci_low": 1606.58,
+          "mean": 1613.72,
+          "std": 36.23299461802597
+        },
+        "raw_invalid_actions": {
+          "ci_high": 1620.78025,
+          "ci_low": 1606.58,
+          "mean": 1613.72,
+          "std": 36.23299461802597
+        },
+        "selected_invalid_actions": {
+          "ci_high": 1620.78025,
+          "ci_low": 1606.58,
+          "mean": 1613.72,
+          "std": 36.23299461802597
+        },
+        "shelter_progress": {
+          "ci_high": 0.0684,
+          "ci_low": 0.0444,
+          "mean": 0.05600000000000001,
+          "std": 0.06208498574168681
+        },
+        "survival_rate": {
+          "ci_high": 0.812,
+          "ci_low": 0.759,
+          "mean": 0.786,
+          "std": 0.13410383433682418
+        },
+        "survivors": {
+          "ci_high": 8.12,
+          "ci_low": 7.59,
+          "mean": 7.86,
+          "std": 1.3410383433682418
+        }
+      }
+    }
+  },
+  "ppo_official_family": {
+    "achievements": {
+      "all_active_agents_alive_100": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "policy_seed_std": 0.0,
+        "success_rate": 1.0
+      },
+      "all_roles_contributed": {
+        "ci_high": 0.9266666666666666,
+        "ci_low": 0.7466666666666667,
+        "policy_seed_std": 0.08736894948054107,
+        "success_rate": 0.8333333333333334
+      },
+      "camp_food_buffer_10": {
+        "ci_high": 0.91,
+        "ci_low": 0.65,
+        "policy_seed_std": 0.1374772708486752,
+        "success_rate": 0.79
+      },
+      "camp_food_buffer_20": {
+        "ci_high": 0.5433333333333333,
+        "ci_low": 0.19666666666666666,
+        "policy_seed_std": 0.18520259177452136,
+        "success_rate": 0.39
+      },
+      "first_deposit": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "policy_seed_std": 0.0,
+        "success_rate": 1.0
+      },
+      "first_food_gathered": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "policy_seed_std": 0.0,
+        "success_rate": 1.0
+      },
+      "first_food_withdrawal": {
+        "ci_high": 1.0,
+        "ci_low": 0.9366666666666666,
+        "policy_seed_std": 0.03214550253664321,
+        "success_rate": 0.9766666666666667
+      },
+      "first_stone_gathered": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "policy_seed_std": 0.0,
+        "success_rate": 1.0
+      },
+      "first_storm_survived": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "policy_seed_std": 0.0,
+        "success_rate": 1.0
+      },
+      "first_wood_gathered": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "policy_seed_std": 0.0,
+        "success_rate": 1.0
+      },
+      "food_security_100_steps": {
+        "ci_high": 0.7466666666666667,
+        "ci_low": 0.27666666666666667,
+        "policy_seed_std": 0.25999999999999995,
+        "success_rate": 0.56
+      },
+      "no_deaths_run": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "policy_seed_std": 0.0,
+        "success_rate": 1.0
+      },
+      "shared_food_transfer": {
+        "ci_high": 0.9433333333333334,
+        "ci_low": 0.8666666666666667,
+        "policy_seed_std": 0.020816659994661344,
+        "success_rate": 0.9066666666666666
+      },
+      "shelter_25_percent": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "policy_seed_std": 0.0,
+        "success_rate": 1.0
+      },
+      "shelter_50_percent": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "policy_seed_std": 0.0,
+        "success_rate": 1.0
+      },
+      "shelter_complete": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "policy_seed_std": 0.0,
+        "success_rate": 1.0
+      }
+    },
+    "civilization_score": {
+      "ci_high": 93.17448951571113,
+      "ci_low": 84.193999205205,
+      "mean": 89.41805686305477,
+      "policy_seed_std": 4.900495989665356
+    },
+    "episodes_per_policy_seed": 100,
+    "metrics": {
+      "achievement_count": {
+        "ci_high": 14.98,
+        "ci_low": 13.813333333333333,
+        "mean": 14.456666666666667,
+        "policy_seed_std": 0.6281984824347587,
+        "std": 1.3860710173385449
+      },
+      "camp_food": {
+        "ci_high": 18.79675,
+        "ci_low": 0.7066666666666667,
+        "mean": 12.0,
+        "policy_seed_std": 9.9118313141417,
+        "std": 11.957002118656325
+      },
+      "deaths": {
+        "ci_high": 0.0,
+        "ci_low": 0.0,
+        "mean": 0.0,
+        "policy_seed_std": 0.0,
+        "std": 0.0
+      },
+      "dense_return": {
+        "ci_high": 176.9989860111021,
+        "ci_low": 167.2845739784669,
+        "mean": 173.13588880554792,
+        "policy_seed_std": 5.403278912952577,
+        "std": 10.326019938631585
+      },
+      "invalid_probability_mass": {
+        "ci_high": 2752.6671436183615,
+        "ci_low": 2712.2611521355534,
+        "mean": 2726.8833620310156,
+        "policy_seed_std": 22.704826144660885,
+        "std": 24.703054797342993
+      },
+      "raw_invalid_actions": {
+        "ci_high": 2743.2035,
+        "ci_low": 2712.9231666666665,
+        "mean": 2724.3533333333335,
+        "policy_seed_std": 16.809409071509073,
+        "std": 21.848562603713397
+      },
+      "selected_invalid_actions": {
+        "ci_high": 0.0,
+        "ci_low": 0.0,
+        "mean": 0.0,
+        "policy_seed_std": 0.0,
+        "std": 0.0
+      },
+      "shelter_progress": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "mean": 1.0,
+        "policy_seed_std": 0.0,
+        "std": 0.0
+      },
+      "survival_rate": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "mean": 1.0,
+        "policy_seed_std": 0.0,
+        "std": 0.0
+      },
+      "survivors": {
+        "ci_high": 10.0,
+        "ci_low": 10.0,
+        "mean": 10.0,
+        "policy_seed_std": 0.0,
+        "std": 0.0
+      }
+    },
+    "policy_seeds": 3
+  },
+  "schema_version": "1.0.0",
+  "seed_suite": {
+    "id": "stage5_6_final_100_v1",
+    "seeds": [
+      10000000,
+      10000001,
+      10000002,
+      10000003,
+      10000004,
+      10000005,
+      10000006,
+      10000007,
+      10000008,
+      10000009,
+      10000010,
+      10000011,
+      10000012,
+      10000013,
+      10000014,
+      10000015,
+      10000016,
+      10000017,
+      10000018,
+      10000019,
+      10000020,
+      10000021,
+      10000022,
+      10000023,
+      10000024,
+      10000025,
+      10000026,
+      10000027,
+      10000028,
+      10000029,
+      10000030,
+      10000031,
+      10000032,
+      10000033,
+      10000034,
+      10000035,
+      10000036,
+      10000037,
+      10000038,
+      10000039,
+      10000040,
+      10000041,
+      10000042,
+      10000043,
+      10000044,
+      10000045,
+      10000046,
+      10000047,
+      10000048,
+      10000049,
+      10000050,
+      10000051,
+      10000052,
+      10000053,
+      10000054,
+      10000055,
+      10000056,
+      10000057,
+      10000058,
+      10000059,
+      10000060,
+      10000061,
+      10000062,
+      10000063,
+      10000064,
+      10000065,
+      10000066,
+      10000067,
+      10000068,
+      10000069,
+      10000070,
+      10000071,
+      10000072,
+      10000073,
+      10000074,
+      10000075,
+      10000076,
+      10000077,
+      10000078,
+      10000079,
+      10000080,
+      10000081,
+      10000082,
+      10000083,
+      10000084,
+      10000085,
+      10000086,
+      10000087,
+      10000088,
+      10000089,
+      10000090,
+      10000091,
+      10000092,
+      10000093,
+      10000094,
+      10000095,
+      10000096,
+      10000097,
+      10000098,
+      10000099
+    ]
+  }
+}

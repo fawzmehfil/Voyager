@@ -2,11 +2,13 @@
 
 Voyager is a Python-first multi-agent reinforcement learning environment for a stranded-island survival economy, paired with a web-based replay/demo layer. The project is inspired by the compact survival benchmark shape of Crafter: a small world, clear environment stepping, achievements, recorded runs, and behavior that can be inspected visually.
 
-Stage 5.5 strengthens shared-policy TensorFlow PPO with authoritative action masks, entropy decay, economy and group-survival reward shaping, and side-by-side deterministic/stochastic evaluation. A recorder, Phaser rendering, and web replay are planned for later stages.
+Stage 5.6 validates three frozen two-million-agent-step TensorFlow PPO policies on 100 held-out seeds each. Across the 300 official deterministic PPO episodes, every run retained 10/10 survivors and completed the shelter. The hierarchical-bootstrap civilization score is 89.42 (95% CI 84.19-93.17). Stage 6 adds the recorder and web replay.
 
 ## Why This Exists
 
-Voyager is meant to become an RL environment where agents learn to survive under scarcity. The first real environment will model agents stranded on an island with food, wood, stone, hunger, energy, shared camp storage, shelter construction, storms, and role specialization. The same runs should also be easy to showcase in a browser, with replay controls, agent panels, event timelines, and metrics.
+Voyager is an RL environment where agents learn to survive under scarcity. The current environment models agents stranded on an island with food, wood, stone, hunger, energy, shared camp storage, shelter construction, storms, and role specialization. The same runs should also be easy to showcase in a browser, with replay controls, agent panels, event timelines, and metrics.
+
+Voyager borrows Crafter's compact environment API, achievement-based evaluation, procedural worlds, recorder ergonomics, and benchmark discipline without copying its single-agent crafting game. Voyager's focus remains population-level survival, division of labor, shared infrastructure, resource allocation, and group resilience.
 
 ## Python API
 
@@ -31,7 +33,7 @@ PettingZoo-style multi-agent environment:
 ```python
 from voyager.envs import VoyagerParallelEnv
 
-env = VoyagerParallelEnv(num_agents=10, days=30)
+env = VoyagerParallelEnv(num_agents=10, max_steps=300)
 obs, infos = env.reset(seed=0)
 
 while env.agents:
@@ -52,10 +54,13 @@ The multi-agent environment supports seeded reset/step loops, roles, shared map 
 - Stage 3: Survival economy mechanics.
 - Stage 4: Random, greedy, and cooperative baseline policies.
 - Stage 5: TensorFlow PPO training.
-- Stage 5.5: Action masking, entropy decay, and economy/group reward shaping. Current.
-- Stage 6: Web replay viewer.
-- Stage 7: Notable runs page.
-- Stage 8: Optional LLM policy layer.
+- Stage 5.5: Action masking, entropy decay, economy/group reward shaping, and three reference training runs. Complete.
+- Stage 5.6: Held-out seeds, achievement success rates, civilization score, benchmark exports, and ablation support. Complete.
+- Stage 6: Versioned recorder, replay loader, API, and interactive web viewer. Next.
+- Stage 7: Real days, shared campfire-to-rescue progression, stronger roles, and procedural scenario families.
+- Stage 8: Recurrent PPO, MAPPO-style centralized critic, and optional pixel/hybrid observations.
+- Stage 9: Research showcase and notable runs.
+- Stage 10: Optional LLM high-level policy layer.
 
 ## Backend Setup
 
@@ -123,6 +128,33 @@ python examples/evaluate_baselines.py \
 When a PPO checkpoint is provided, evaluation always prints separate `ppo_deterministic` and `ppo_stochastic` rows. The environment masks impossible or currently useless actions during training and inference, including empty gathers, eating without food, invalid camp transactions, and shelter building without material.
 
 `--total-steps` counts agent transitions, not only world ticks. With `10` agents and `128` rollout steps, one PPO update collects up to `1280` training samples. Entropy decays linearly across those agent transitions from `--entropy-coef-start` to `--entropy-coef-end`.
+
+## Stage 5.6 Benchmark
+
+The final benchmark evaluates random, greedy, cooperative, and all three frozen PPO checkpoints on seeds `10000000` through `10000099`. Deterministic PPO is the official learned-policy result; stochastic PPO is reported separately.
+
+Official deterministic PPO family results across 300 episodes:
+
+- Mean survivors: `10.00/10` (all episodes).
+- Mean shelter progress: `1.00` (all episodes completed the shelter).
+- Mean achievements: `14.46/16`.
+- Civilization score: `89.42`, hierarchical-bootstrap 95% CI `84.19-93.17`.
+- Individual checkpoint scores: `93.16`, `90.80`, and `83.74`.
+
+Baseline civilization scores were `29.45` for random, `24.93` for greedy survival, and `33.02` for cooperative scripted play. The benchmark exports episode-level JSONL, aggregate JSON, achievement CSV, policy CSV, reward/action diagnostics, metric curves, and artifact checksums. Frozen checkpoints, manifests, and the compact final result are under `benchmarks/`.
+
+Run or reproduce it with:
+
+```bash
+python examples/run_benchmark.py \
+  --manifest benchmarks/manifests/stage5_6_final.json \
+  --output results/benchmark/stage5_6_final_v1 \
+  --resume
+```
+
+The environment also exposes `VoyagerReward-v0`, `VoyagerAchievement-v0`, and `VoyagerNoReward-v0`, plus training flags for action-mask, reward-component, and role-observation ablations.
+
+After replay infrastructure is stable, the environment will add real days and a compact shared progression from campfire through shelter, storage, renewable resources, and a rescue signal or raft. Longer one-, three-, ten-, and thirty-day tasks will be introduced through curriculum training.
 
 ## Frontend Setup
 

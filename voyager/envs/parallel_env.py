@@ -9,6 +9,7 @@ from pettingzoo import ParallelEnv
 
 from voyager.sim.constants import ACTION_COUNT, ROLE_COUNT, Resource, Terrain
 from voyager.sim.multi_world import ROLE_IDS, MultiAgentWorld
+from voyager.sim.rewards import DENSE_REWARD_COMPONENTS, REWARD_MODES, RewardMode
 
 
 class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
@@ -29,6 +30,9 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
         storm_damage: float = 1.0,
         food_regen_interval: int = 50,
         food_spawn_rate: float = 0.04,
+        reward_mode: RewardMode = "dense",
+        disabled_reward_components: tuple[str, ...] = (),
+        mask_role_observation: bool = False,
         render_mode: str | None = None,
     ) -> None:
         if map_size < 9:
@@ -37,12 +41,21 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
             raise ValueError("local_view_size must be an odd integer >= 3.")
         if render_mode not in self.metadata["render_modes"] and render_mode is not None:
             raise ValueError(f"Unsupported render_mode: {render_mode!r}.")
+        if reward_mode not in REWARD_MODES:
+            raise ValueError(f"Unsupported reward_mode: {reward_mode!r}.")
+        unknown_components = set(disabled_reward_components) - DENSE_REWARD_COMPONENTS
+        if unknown_components:
+            names = ", ".join(sorted(unknown_components))
+            raise ValueError(f"Unknown disabled reward components: {names}")
 
         self._configured_num_agents = num_agents
         self.map_size = map_size
         self.max_steps = max_steps
         self.local_view_size = local_view_size
         self.inventory_capacity = inventory_capacity
+        self.reward_mode = reward_mode
+        self.disabled_reward_components = frozenset(disabled_reward_components)
+        self.mask_role_observation = mask_role_observation
         self.render_mode = render_mode
         self.world = MultiAgentWorld(
             num_agents=num_agents,
@@ -96,8 +109,12 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
         results = self.world.step(actions)
         max_step_reached = self.world.state is not None and self.world.state.step_count >= self.max_steps
 
+        selected_components = {
+            agent_id: self._selected_reward_components(results[agent_id])
+            for agent_id in acting_agents
+        }
         rewards = {
-            agent_id: results[agent_id].reward
+            agent_id: float(sum(selected_components[agent_id].values()))
             for agent_id in acting_agents
         }
         terminations = {
@@ -112,7 +129,9 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
             agent_id: self._info(
                 agent_id,
                 results[agent_id].event,
-                results[agent_id].reward_components,
+                selected_components[agent_id],
+                dense_reward_components=results[agent_id].reward_components,
+                new_achievements=results[agent_id].new_achievements,
             )
             for agent_id in acting_agents
         }
@@ -224,7 +243,8 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
                         local_view[row, col, 3] = 255
 
         role = np.zeros(ROLE_COUNT, dtype=np.float32)
-        role[ROLE_IDS[agent.role]] = 1.0
+        if not self.mask_role_observation:
+            role[ROLE_IDS[agent.role]] = 1.0
 
         return {
             "local_view": local_view,
@@ -261,6 +281,8 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
         agent_id: str,
         event: str,
         reward_components: dict[str, float] | None = None,
+        dense_reward_components: dict[str, float] | None = None,
+        new_achievements: tuple[str, ...] = (),
     ) -> dict[str, Any]:
         state = self.world.state
         if state is None:
@@ -284,4 +306,21 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
             "achievements": sorted(state.achievements),
             "action_mask": self.action_mask(agent_id),
             "reward_components": dict(reward_components or {}),
+            "dense_reward_components": dict(
+                dense_reward_components
+                if dense_reward_components is not None
+                else reward_components or {}
+            ),
+            "new_achievements": list(new_achievements),
+        }
+
+    def _selected_reward_components(self, result: Any) -> dict[str, float]:
+        if self.reward_mode == "achievement":
+            return {"achievement": float(len(result.new_achievements))}
+        if self.reward_mode == "none":
+            return {}
+        return {
+            name: value
+            for name, value in result.reward_components.items()
+            if name not in self.disabled_reward_components
         }

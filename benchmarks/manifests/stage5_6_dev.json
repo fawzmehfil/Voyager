@@ -1,0 +1,94 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark_id": "stage5_6_dev_v1",
+  "scenario": {
+    "id": "stage5_5_standard_300_v1",
+    "environment_version": "stage5.5",
+    "reward_version": "stage5.5_economy_group_v1",
+    "observation_version": "structured_210_v1",
+    "action_version": "discrete_13_v1",
+    "achievement_version": "stage5.6_16_v1",
+    "config": {
+      "num_agents": 10,
+      "map_size": 32,
+      "max_steps": 300,
+      "local_view_size": 7,
+      "inventory_capacity": 10,
+      "storm_start_step": 200,
+      "storm_interval": 200,
+      "storm_duration": 25,
+      "storm_damage": 1.0,
+      "food_regen_interval": 50,
+      "food_spawn_rate": 0.04
+    }
+  },
+  "seed_suite": {
+    "id": "stage5_6_dev_20_v1",
+    "seeds": [
+      5000000, 5000001, 5000002, 5000003, 5000004,
+      5000005, 5000006, 5000007, 5000008, 5000009,
+      5000010, 5000011, 5000012, 5000013, 5000014,
+      5000015, 5000016, 5000017, 5000018, 5000019
+    ]
+  },
+  "policies": [
+    {"id": "random", "kind": "random", "official": true},
+    {"id": "greedy", "kind": "greedy", "official": true},
+    {"id": "cooperative", "kind": "cooperative", "official": true},
+    {
+      "id": "ppo_seed0_deterministic",
+      "kind": "ppo",
+      "official": true,
+      "checkpoint": "benchmarks/checkpoints/stage5_5_seed0",
+      "checkpoint_sha256": "b62a557da4b490a5f6ff80d1aea37e5f6d4787523faad721a8d62ae033c02216",
+      "training_seed": 0,
+      "inference_mode": "deterministic"
+    },
+    {
+      "id": "ppo_seed1_deterministic",
+      "kind": "ppo",
+      "official": true,
+      "checkpoint": "benchmarks/checkpoints/stage5_5_seed1",
+      "checkpoint_sha256": "48e184b64884bc9507dd22441a8c21c28aeb9e1e38ab9dc70bcd70316fa9fb73",
+      "training_seed": 1,
+      "inference_mode": "deterministic"
+    },
+    {
+      "id": "ppo_seed2_deterministic",
+      "kind": "ppo",
+      "official": true,
+      "checkpoint": "benchmarks/checkpoints/stage5_5_seed2",
+      "checkpoint_sha256": "44e7fda0c3b10cf4734bef6fa008098113ec039912070012922ef46015477979",
+      "training_seed": 2,
+      "inference_mode": "deterministic"
+    },
+    {
+      "id": "ppo_seed0_stochastic",
+      "kind": "ppo",
+      "official": false,
+      "checkpoint": "benchmarks/checkpoints/stage5_5_seed0",
+      "checkpoint_sha256": "b62a557da4b490a5f6ff80d1aea37e5f6d4787523faad721a8d62ae033c02216",
+      "training_seed": 0,
+      "inference_mode": "stochastic"
+    },
+    {
+      "id": "ppo_seed1_stochastic",
+      "kind": "ppo",
+      "official": false,
+      "checkpoint": "benchmarks/checkpoints/stage5_5_seed1",
+      "checkpoint_sha256": "48e184b64884bc9507dd22441a8c21c28aeb9e1e38ab9dc70bcd70316fa9fb73",
+      "training_seed": 1,
+      "inference_mode": "stochastic"
+    },
+    {
+      "id": "ppo_seed2_stochastic",
+      "kind": "ppo",
+      "official": false,
+      "checkpoint": "benchmarks/checkpoints/stage5_5_seed2",
+      "checkpoint_sha256": "44e7fda0c3b10cf4734bef6fa008098113ec039912070012922ef46015477979",
+      "training_seed": 2,
+      "inference_mode": "stochastic"
+    }
+  ],
+  "bootstrap": {"samples": 10000, "seed": 0, "confidence": 0.95}
+}

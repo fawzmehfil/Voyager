@@ -4,6 +4,7 @@ from dataclasses import dataclass, field, replace
 
 import numpy as np
 
+from voyager.sim.achievements import ACHIEVEMENT_SET
 from voyager.sim.constants import ACTION_COUNT, Action, Resource, Role, Terrain
 from voyager.sim.mapgen import generate_island
 from voyager.sim.state import AgentState, CampState, MultiAgentWorldState
@@ -26,6 +27,7 @@ class AgentStepResult:
     truncated: bool
     event: str
     reward_components: dict[str, float] = field(default_factory=dict)
+    new_achievements: tuple[str, ...] = ()
 
 
 class MultiAgentWorld:
@@ -92,6 +94,7 @@ class MultiAgentWorld:
         state = self._require_state()
         previous_deaths = state.deaths
         previous_shelter_progress = state.camp.shelter_progress
+        previous_achievements = set(state.achievements)
         state.step_count += 1
         occupied = {
             (agent.x, agent.y)
@@ -124,10 +127,10 @@ class MultiAgentWorld:
             }:
                 event, invalid = self._move(agent, action, occupied)
             elif action == Action.GATHER:
-                event, invalid, action_reward = self._gather(agent)
+                event, invalid, action_reward = self._gather(agent_id, agent)
                 reward_components["action"] += action_reward
             elif action == Action.EAT:
-                event, invalid, action_reward = self._eat(agent)
+                event, invalid, action_reward = self._eat(agent_id, agent)
                 reward_components["action"] += action_reward
             elif action == Action.REST:
                 event, invalid, action_reward = self._rest(agent)
@@ -137,13 +140,13 @@ class MultiAgentWorld:
                 Action.DEPOSIT_WOOD,
                 Action.DEPOSIT_STONE,
             }:
-                event, invalid, action_reward = self._deposit(agent, action)
+                event, invalid, action_reward = self._deposit(agent_id, agent, action)
                 reward_components["action"] += action_reward
             elif action == Action.WITHDRAW_FOOD:
-                event, invalid, action_reward = self._withdraw_food(agent)
+                event, invalid, action_reward = self._withdraw_food(agent_id, agent)
                 reward_components["action"] += action_reward
             elif action == Action.BUILD_SHELTER:
-                event, invalid, action_reward = self._build_shelter(agent)
+                event, invalid, action_reward = self._build_shelter(agent_id, agent)
                 reward_components["action"] += action_reward
             elif action == Action.NOOP:
                 event = "noop"
@@ -179,6 +182,13 @@ class MultiAgentWorld:
         )
         self._regenerate_food()
         self._update_achievements()
+        new_achievements = tuple(sorted(state.achievements - previous_achievements))
+        if new_achievements:
+            for agent_id, result in tuple(results.items()):
+                results[agent_id] = replace(
+                    result,
+                    new_achievements=new_achievements,
+                )
         return results
 
     def alive_agents(self) -> list[str]:
@@ -291,9 +301,21 @@ class MultiAgentWorld:
             },
             "storm_active": self.is_storm_active(),
             "achievements": sorted(state.achievements),
+            "achievement_steps": dict(sorted(state.achievement_steps.items())),
             "total_deposits": state.total_deposits,
             "total_withdrawals": state.total_withdrawals,
             "total_build_actions": state.total_build_actions,
+            "resource_flow": {
+                "gathered": dict(state.gathered_resources),
+                "deposited": dict(state.deposited_resources),
+                "withdrawn": {"food": state.total_withdrawals},
+                "consumed": dict(state.consumed_resources),
+                "constructed": dict(state.constructed_resources),
+            },
+            "contributing_roles": sorted(state.contributing_roles),
+            "food_security_steps": state.food_security_steps,
+            "max_food_security_steps": state.max_food_security_steps,
+            "shelter_completion_step": state.shelter_completion_step,
         }
 
     def _move(
@@ -321,7 +343,7 @@ class MultiAgentWorld:
         agent.energy = max(0.0, agent.energy - 1.5)
         return "move", False
 
-    def _gather(self, agent: AgentState) -> tuple[str, bool, float]:
+    def _gather(self, agent_id: str, agent: AgentState) -> tuple[str, bool, float]:
         state = self._require_state()
         resource = Resource(int(state.resource_ids[agent.y, agent.x]))
         quantity = int(state.resource_quantities[agent.y, agent.x])
@@ -336,18 +358,26 @@ class MultiAgentWorld:
             return f"invalid_{name}_full", True, 0.0
 
         agent.inventory[name] += 1
+        if name == "food":
+            agent.food_origins.append(None)
         agent.energy = max(0.0, agent.energy - 2.0)
+        state.gathered_resources[name] += 1
+        self._unlock(f"first_{name}_gathered")
         state.resource_quantities[agent.y, agent.x] = quantity - 1
         if state.resource_quantities[agent.y, agent.x] == 0:
             state.resource_ids[agent.y, agent.x] = Resource.NONE
         return f"gather_{name}", False, 0.10
 
-    def _eat(self, agent: AgentState) -> tuple[str, bool, float]:
+    def _eat(self, agent_id: str, agent: AgentState) -> tuple[str, bool, float]:
         if agent.inventory["food"] <= 0:
             return "invalid_no_food", True, 0.0
 
         was_meaningfully_hungry = agent.hunger >= 35.0
         agent.inventory["food"] -= 1
+        origin = agent.food_origins.pop(0) if agent.food_origins else None
+        if origin is not None and origin != agent_id:
+            self._unlock("shared_food_transfer")
+        self._require_state().consumed_resources["food"] += 1
         agent.hunger = max(0.0, agent.hunger - 35.0)
         return "eat", False, 0.30 if was_meaningfully_hungry else 0.0
 
@@ -358,7 +388,12 @@ class MultiAgentWorld:
         agent.energy = min(100.0, agent.energy + 10.0)
         return "rest", False, 0.05 if was_low_energy else 0.0
 
-    def _deposit(self, agent: AgentState, action: Action) -> tuple[str, bool, float]:
+    def _deposit(
+        self,
+        agent_id: str,
+        agent: AgentState,
+        action: Action,
+    ) -> tuple[str, bool, float]:
         state = self._require_state()
         if not self._at_camp(agent):
             return "invalid_not_at_camp", True, 0.0
@@ -374,7 +409,13 @@ class MultiAgentWorld:
         agent.inventory[resource_name] -= 1
         state.camp.stockpile[resource_name] += 1
         state.total_deposits += 1
-        state.achievements.add("first_deposit")
+        state.deposited_resources[resource_name] += 1
+        state.contributing_roles.add(agent.role)
+        self._unlock("first_deposit")
+        if resource_name == "food":
+            if agent.food_origins:
+                agent.food_origins.pop(0)
+            state.camp.food_origins.append(agent_id)
         if resource_name == "food":
             food_target = max(1, len(self.alive_agents()) * 2)
             new_reserve = state.camp.stockpile["food"] > state.camp.food_high_watermark
@@ -392,7 +433,7 @@ class MultiAgentWorld:
             action_reward = 0.12 if state.camp.shelter_progress < 1.0 else 0.02
         return f"deposit_{resource_name}", False, action_reward
 
-    def _withdraw_food(self, agent: AgentState) -> tuple[str, bool, float]:
+    def _withdraw_food(self, agent_id: str, agent: AgentState) -> tuple[str, bool, float]:
         state = self._require_state()
         if not self._at_camp(agent):
             return "invalid_not_at_camp", True, 0.0
@@ -403,11 +444,18 @@ class MultiAgentWorld:
 
         state.camp.stockpile["food"] -= 1
         agent.inventory["food"] += 1
+        origin = state.camp.food_origins.pop(0) if state.camp.food_origins else None
+        agent.food_origins.append(origin)
         state.total_withdrawals += 1
-        state.achievements.add("first_food_withdrawal")
+        self._unlock("first_food_withdrawal")
         return "withdraw_food", False, 0.0
 
-    def _build_shelter(self, agent: AgentState) -> tuple[str, bool, float]:
+    def _build_shelter(
+        self,
+        agent_id: str,
+        agent: AgentState,
+    ) -> tuple[str, bool, float]:
+        _ = agent_id
         state = self._require_state()
         if not self._at_camp(agent):
             return "invalid_not_at_camp", True, 0.0
@@ -438,6 +486,8 @@ class MultiAgentWorld:
         build_amount = 0.06 if agent.role == "builder" else 0.04
         state.camp.shelter_progress = min(1.0, state.camp.shelter_progress + build_amount)
         state.total_build_actions += 1
+        state.constructed_resources[material] += 1
+        state.contributing_roles.add(agent.role)
         self._update_shelter_achievements()
         event = f"build_shelter_{material}" if source == "inventory" else f"build_shelter_camp_{material}"
         return event, False, 0.15
@@ -457,7 +507,7 @@ class MultiAgentWorld:
         storm_active = self.is_storm_active()
         if not storm_active:
             if state.storm_was_active and self.alive_agents():
-                state.achievements.add("first_storm_survived")
+                self._unlock("first_storm_survived")
             state.storm_was_active = False
             return
 
@@ -543,16 +593,50 @@ class MultiAgentWorld:
         state = self._require_state()
         self._update_shelter_achievements()
         if state.step_count >= 100 and state.deaths == 0:
-            state.achievements.add("all_active_agents_alive_100")
+            self._unlock("all_active_agents_alive_100")
+
+        food = state.camp.stockpile["food"]
+        if food >= 10:
+            self._unlock("camp_food_buffer_10")
+        if food >= 20:
+            self._unlock("camp_food_buffer_20")
+
+        alive_count = len(self.alive_agents())
+        if alive_count > 0 and food >= alive_count:
+            state.food_security_steps += 1
+        else:
+            state.food_security_steps = 0
+        state.max_food_security_steps = max(
+            state.max_food_security_steps,
+            state.food_security_steps,
+        )
+        if state.food_security_steps >= 100:
+            self._unlock("food_security_100_steps")
+
+        if set(ROLE_NAMES.values()).issubset(state.contributing_roles):
+            self._unlock("all_roles_contributed")
+        if state.step_count >= self.max_steps and state.deaths == 0:
+            self._unlock("no_deaths_run")
 
     def _update_shelter_achievements(self) -> None:
         state = self._require_state()
         if state.camp.shelter_progress >= 0.25:
-            state.achievements.add("shelter_25_percent")
+            self._unlock("shelter_25_percent")
         if state.camp.shelter_progress >= 0.50:
-            state.achievements.add("shelter_50_percent")
+            self._unlock("shelter_50_percent")
         if state.camp.shelter_progress >= 1.0:
-            state.achievements.add("shelter_complete")
+            self._unlock("shelter_complete")
+            if state.shelter_completion_step is None:
+                state.shelter_completion_step = state.step_count
+
+    def _unlock(self, achievement_id: str) -> None:
+        state = self._require_state()
+        if achievement_id not in ACHIEVEMENT_SET:
+            raise ValueError(f"Unknown achievement: {achievement_id}")
+        if achievement_id in state.achievements:
+            return
+        state.achievements.add(achievement_id)
+        state.achievement_steps[achievement_id] = state.step_count
 
     def _at_camp(self, agent: AgentState) -> bool:
         state = self._require_state()
