@@ -1,6 +1,7 @@
 # Local planning notes
 *_TECHNICAL_PLAN.md
 docs/
+.design-reference/
 
 # Python
 .venv/

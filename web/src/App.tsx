@@ -1,59 +1,36 @@
-const plannedRuns = [
-  {
-    name: "Random",
-    detail: "Baseline rollout once Stage 1 exposes a working environment.",
-  },
-  {
-    name: "Scripted",
-    detail: "Greedy and cooperative policies planned for Stage 4.",
-  },
-  {
-    name: "PPO",
-    detail: "TensorFlow PPO training planned for Stage 5.",
-  },
-];
+import { lazy, Suspense } from "react";
+
+const ReplayPlayer = lazy(() =>
+  import("./components/ReplayPlayer").then((module) => ({
+    default: module.ReplayPlayer,
+  })),
+);
 
 export function App() {
   return (
-    <main className="shell">
-      <section className="intro">
-        <p className="eyebrow">Stage 0</p>
-        <h1>Voyager</h1>
-        <p className="subtitle">Multi-agent RL survival economy environment</p>
-      </section>
-
-      <section className="status-grid" aria-label="Project status">
-        <article>
-          <h2>Stage 0: Project Skeleton</h2>
-          <p>
-            The repository now has the Python package, documentation, examples, run
-            conventions, and a static web placeholder.
-          </p>
-        </article>
-        <article>
-          <h2>Next: Single-agent Crafter-style prototype</h2>
-          <p>
-            Stage 1 will replace the placeholder environment with a deterministic
-            island, basic survival state, resource gathering, and a working Gymnasium
-            loop.
-          </p>
-        </article>
-      </section>
-
-      <section className="runs" aria-labelledby="runs-title">
-        <div className="section-heading">
-          <p className="eyebrow">Planned comparisons</p>
-          <h2 id="runs-title">Run Slots</h2>
+    <main className="page-shell">
+      <header className="page-intro">
+        <div>
+          <p className="eyebrow">STAGE 6A · SHOWCASE REPLAY</p>
+          <h1>VOYAGER</h1>
         </div>
-        <div className="run-grid">
-          {plannedRuns.map((run) => (
-            <article className="run-card" key={run.name}>
-              <h3>{run.name}</h3>
-              <p>{run.detail}</p>
-            </article>
-          ))}
-        </div>
-      </section>
+        <p>
+          TEN AGENTS. ONE ISLAND. <span>25 SECONDS TO BUILD A CIVILIZATION.</span>
+        </p>
+      </header>
+      <Suspense
+        fallback={
+          <div className="replay-frame app-loading" aria-label="Loading replay player">
+            <span>LOADING REPLAY...</span>
+          </div>
+        }
+      >
+        <ReplayPlayer />
+      </Suspense>
+      <footer>
+        <span>FROZEN STAGE 5.6 POLICY</span>
+        <span>10 / 10 SURVIVORS · 16 / 16 ACHIEVEMENTS</span>
+      </footer>
     </main>
   );
 }
