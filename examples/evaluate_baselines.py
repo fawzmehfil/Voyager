@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from voyager.policies.evaluation import evaluate_baselines, ppo_policy_specs, print_summary
+from voyager.replay.recorder import record_episode
 
 
 def parse_args() -> argparse.Namespace:
@@ -18,6 +20,19 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional checkpoint directory, usually checkpoints/stage5/latest.",
     )
+    parser.add_argument(
+        "--record-replay",
+        action="append",
+        default=[],
+        metavar="POLICY:SEED",
+        help="Record selected versioned policy/seed pairs after evaluation.",
+    )
+    parser.add_argument(
+        "--replay-manifest",
+        type=Path,
+        default=Path("benchmarks/manifests/stage5_6_final.json"),
+    )
+    parser.add_argument("--replay-output", type=Path, default=Path("runs/replays"))
     parser.add_argument(
         "--ppo-stochastic",
         action="store_true",
@@ -38,6 +53,20 @@ def main() -> int:
         extra_policies=extra_policies,
     )
     print_summary(results)
+    for target in args.record_replay:
+        try:
+            policy_id, seed_value = target.rsplit(":", maxsplit=1)
+            seed = int(seed_value)
+        except ValueError as exc:
+            raise ValueError("--record-replay must use POLICY:SEED.") from exc
+        replay = record_episode(
+            args.replay_manifest,
+            policy_id=policy_id,
+            seed=seed,
+            output_root=args.replay_output,
+            tags=("evaluation",),
+        )
+        print(f"recorded replay: {replay}")
     return 0
 
 

@@ -1,0 +1,160 @@
+{
+  "cues": [
+    {
+      "end_tick": 23,
+      "kind": "overview",
+      "label": "The island",
+      "start_tick": 0,
+      "target": {
+        "x": 15.0,
+        "y": 14.8
+      },
+      "zoom": 0.66
+    },
+    {
+      "end_tick": 47,
+      "importance": 70,
+      "kind": "event",
+      "label": "first_deposit",
+      "start_tick": 24,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 72,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 48,
+      "target": {
+        "x": 22,
+        "y": 10
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 96,
+      "importance": 70,
+      "kind": "event",
+      "label": "shelter_complete",
+      "start_tick": 73,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 120,
+      "importance": 70,
+      "kind": "event",
+      "label": "all_active_agents_alive_100",
+      "start_tick": 97,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 144,
+      "importance": 76,
+      "kind": "event",
+      "label": "Shared Food Transfer",
+      "start_tick": 121,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 168,
+      "importance": 48,
+      "kind": "event",
+      "label": "Deposit",
+      "start_tick": 145,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 192,
+      "importance": 48,
+      "kind": "event",
+      "label": "Deposit",
+      "start_tick": 169,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 216,
+      "importance": 90,
+      "kind": "event",
+      "label": "Storm Started",
+      "start_tick": 193,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 240,
+      "importance": 85,
+      "kind": "event",
+      "label": "Storm Ended",
+      "start_tick": 217,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 265,
+      "importance": 48,
+      "kind": "event",
+      "label": "Deposit",
+      "start_tick": 241,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 275,
+      "importance": 48,
+      "kind": "event",
+      "label": "Deposit",
+      "start_tick": 266,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 300,
+      "kind": "finale",
+      "label": "The survivors",
+      "start_tick": 276,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 0.72
+    }
+  ],
+  "mode": "automatic",
+  "version": "camera_director_1.0.0"
+}

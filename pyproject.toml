@@ -17,8 +17,13 @@ dependencies = [
   "uvicorn",
 ]
 
+[project.scripts]
+voyager-replay = "voyager.replay.cli:main"
+voyager-web = "voyager.server.__main__:main"
+
 [project.optional-dependencies]
 dev = [
+  "httpx",
   "pytest",
   "ruff",
   "mypy",

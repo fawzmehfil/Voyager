@@ -1,0 +1,83 @@
+{
+  "cues": [
+    {
+      "end_tick": 23,
+      "kind": "overview",
+      "label": "The island",
+      "start_tick": 0,
+      "target": {
+        "x": 16,
+        "y": 16
+      },
+      "zoom": 0.68
+    },
+    {
+      "end_tick": 59,
+      "kind": "event",
+      "label": "First supplies",
+      "start_tick": 24,
+      "target": {
+        "x": 16,
+        "y": 16
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 139,
+      "kind": "event",
+      "label": "Building shelter",
+      "start_tick": 60,
+      "target": {
+        "x": 16,
+        "y": 16
+      },
+      "zoom": 0.92
+    },
+    {
+      "end_tick": 199,
+      "kind": "team",
+      "label": "Working together",
+      "start_tick": 140,
+      "target": {
+        "x": 16,
+        "y": 16
+      },
+      "zoom": 0.78
+    },
+    {
+      "end_tick": 227,
+      "kind": "weather",
+      "label": "The storm",
+      "start_tick": 200,
+      "target": {
+        "x": 16,
+        "y": 16
+      },
+      "zoom": 0.66
+    },
+    {
+      "end_tick": 275,
+      "kind": "event",
+      "label": "Food security",
+      "start_tick": 228,
+      "target": {
+        "x": 16,
+        "y": 16
+      },
+      "zoom": 0.88
+    },
+    {
+      "end_tick": 300,
+      "kind": "finale",
+      "label": "10/10 survived",
+      "start_tick": 276,
+      "target": {
+        "x": 16,
+        "y": 16
+      },
+      "zoom": 0.7
+    }
+  ],
+  "mode": "showcase",
+  "version": "camera_director_1.0.0"
+}

@@ -1,0 +1,148 @@
+{
+  "cues": [
+    {
+      "end_tick": 24,
+      "kind": "overview",
+      "label": "The island",
+      "start_tick": 0,
+      "target": {
+        "x": 15.0,
+        "y": 14.8
+      },
+      "zoom": 0.66
+    },
+    {
+      "end_tick": 51,
+      "importance": 70,
+      "kind": "event",
+      "label": "first_food_gathered",
+      "start_tick": 25,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 87,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 52,
+      "target": {
+        "x": 12,
+        "y": 13
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 113,
+      "importance": 70,
+      "kind": "event",
+      "label": "first_deposit",
+      "start_tick": 89,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 139,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 114,
+      "target": {
+        "x": 14,
+        "y": 19
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 164,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 140,
+      "target": {
+        "x": 18,
+        "y": 19
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 190,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 165,
+      "target": {
+        "x": 16,
+        "y": 14
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 219,
+      "importance": 90,
+      "kind": "event",
+      "label": "Storm Started",
+      "start_tick": 191,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 246,
+      "importance": 85,
+      "kind": "event",
+      "label": "Storm Ended",
+      "start_tick": 220,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 271,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 247,
+      "target": {
+        "x": 18,
+        "y": 10
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 275,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 272,
+      "target": {
+        "x": 9,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 300,
+      "kind": "finale",
+      "label": "The survivors",
+      "start_tick": 276,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 0.72
+    }
+  ],
+  "mode": "automatic",
+  "version": "camera_director_1.0.0"
+}

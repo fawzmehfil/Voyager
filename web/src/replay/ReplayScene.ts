@@ -14,11 +14,10 @@ import type {
   ReplayStatus,
   TerrainType,
 } from "./types";
+import type { CameraCue } from "./platformTypes";
 
 const TILE_SIZE = 48;
 const ART_SCALE = 3;
-const TICK_DURATION = 1000 / 12;
-
 const ACHIEVEMENT_LABELS: Record<string, string> = {
   shelter_25_percent: "SHELTER FRAME RAISED",
   shelter_50_percent: "SHELTER HALF BUILT",
@@ -45,6 +44,8 @@ const ACTION_LABELS: Record<string, string> = {
 
 interface ReplayHooks {
   onStatus: (status: ReplayStatus) => void;
+  onSelectAgent?: (agentId: string) => void;
+  onManualCamera?: () => void;
 }
 
 interface AgentVisual {
@@ -63,6 +64,11 @@ export class ReplayScene extends Phaser.Scene {
   private frameIndex = 0;
   private accumulator = 0;
   private isPlaying = true;
+  private playbackRate = 1;
+  private automaticCamera = true;
+  private followedAgent: string | null = null;
+  private pendingSeek: number | null = null;
+  private isSeeking = false;
   private soundEnabled = false;
   private audioContext?: AudioContext;
   private agentVisuals = new Map<string, AgentVisual>();
@@ -86,12 +92,14 @@ export class ReplayScene extends Phaser.Scene {
   private currentAlive = 10;
   private firstDepositAgent = "";
   private sharingAgent = "";
+  private cameraCues: CameraCue[];
 
-  constructor(replay: ReplayArtifact, hooks: ReplayHooks) {
+  constructor(replay: ReplayArtifact, hooks: ReplayHooks, cameraCues: CameraCue[] = []) {
     super({ key: "VoyagerReplay" });
     this.replay = replay;
     this.hooks = hooks;
     this.currentCamp = replay.world.initial.camp;
+    this.cameraCues = cameraCues;
   }
 
   create() {
@@ -105,23 +113,35 @@ export class ReplayScene extends Phaser.Scene {
     this.createWeather();
     this.createToast();
     this.setCameraImmediately();
+    this.installCameraControls();
+    if (this.pendingSeek !== null) {
+      const target = this.pendingSeek;
+      this.pendingSeek = null;
+      this.isSeeking = true;
+      while (this.frameIndex < target && this.frameIndex < this.replay.frames.length) {
+        this.applyFrame(this.replay.frames[this.frameIndex]);
+        this.frameIndex += 1;
+      }
+      this.isSeeking = false;
+      this.emitStatus();
+    }
     this.emitStatus();
   }
 
   update(_time: number, delta: number) {
     this.animationClock += delta;
     this.updateAmbientAnimation(delta);
-    this.directCamera();
+    if (this.automaticCamera) this.directCamera();
     if (!this.isPlaying || this.frameIndex >= this.replay.frames.length) {
       return;
     }
 
     this.accumulator += delta;
     while (
-      this.accumulator >= TICK_DURATION &&
+      this.accumulator >= 1000 / (this.replay.tick_rate * this.playbackRate) &&
       this.frameIndex < this.replay.frames.length
     ) {
-      this.accumulator -= TICK_DURATION;
+      this.accumulator -= 1000 / (this.replay.tick_rate * this.playbackRate);
       const frame = this.replay.frames[this.frameIndex];
       this.frameIndex += 1;
       this.applyFrame(frame);
@@ -138,9 +158,15 @@ export class ReplayScene extends Phaser.Scene {
   }
 
   restartReplay() {
+    this.seekTo(0);
+    this.isPlaying = true;
+  }
+
+  seekTo(step: number) {
+    this.isPlaying = false;
+    this.pendingSeek = Phaser.Math.Clamp(Math.round(step), 0, this.replay.frames.length);
     this.frameIndex = 0;
     this.accumulator = 0;
-    this.isPlaying = true;
     this.currentStorm = false;
     this.currentCamp = this.replay.world.initial.camp;
     this.currentAlive = this.replay.world.initial.agents.length;
@@ -158,6 +184,25 @@ export class ReplayScene extends Phaser.Scene {
     this.toast = undefined;
     this.finale = undefined;
     this.scene.restart();
+  }
+
+  stepBy(delta: number) {
+    this.isPlaying = false;
+    this.seekTo(this.frameIndex + delta);
+  }
+
+  setPlaybackRate(rate: number) {
+    this.playbackRate = Phaser.Math.Clamp(rate, 0.25, 4);
+  }
+
+  setAutomaticCamera(enabled: boolean) {
+    this.automaticCamera = enabled;
+    if (enabled) this.followedAgent = null;
+  }
+
+  followAgent(agentId: string | null) {
+    this.followedAgent = agentId;
+    this.automaticCamera = true;
   }
 
   setSoundEnabled(enabled: boolean) {
@@ -300,6 +345,9 @@ export class ReplayScene extends Phaser.Scene {
         [shadow, body, role, name, bubble],
       );
       container.setDepth(3000 + this.tileY(agent.y));
+      body
+        .setInteractive({ useHandCursor: true })
+        .on("pointerdown", () => this.hooks.onSelectAgent?.(agent.id));
       this.agentVisuals.set(agent.id, {
         container,
         body,
@@ -354,14 +402,16 @@ export class ReplayScene extends Phaser.Scene {
     frame.resource_changes.forEach((resource) => this.upsertResource(resource));
     this.updateCamp(frame.camp);
     frame.agents.forEach((agent) => this.updateAgent(agent, frame.step));
-    frame.new_achievements.forEach((achievement) =>
-      this.showAchievement(achievement),
-    );
+    if (!this.isSeeking) {
+      frame.new_achievements.forEach((achievement) =>
+        this.showAchievement(achievement),
+      );
+    }
     this.setStorm(frame.storm);
     this.currentCamp = frame.camp;
     this.currentAlive = frame.agents.filter((agent) => agent.alive).length;
     this.emitStatus();
-    if (frame.step === this.replay.summary.world_steps) {
+    if (frame.step === this.replay.summary.world_steps && !this.isSeeking) {
       this.finishReplay();
     }
   }
@@ -390,20 +440,25 @@ export class ReplayScene extends Phaser.Scene {
     visual.body.setTexture(characterTextureKey(agent.id, visual.direction, pose));
 
     this.tweens.killTweensOf(visual.container);
-    this.tweens.add({
-      targets: visual.container,
-      x: this.tileX(agent.x),
-      y: this.tileY(agent.y),
-      duration: moving ? 74 : 30,
-      ease: "Sine.easeOut",
-      onUpdate: () => {
-        visual.container.setDepth(3000 + visual.container.y);
-      },
-    });
+    if (this.isSeeking) {
+      visual.container.setPosition(this.tileX(agent.x), this.tileY(agent.y));
+      visual.container.setDepth(3000 + visual.container.y);
+    } else {
+      this.tweens.add({
+        targets: visual.container,
+        x: this.tileX(agent.x),
+        y: this.tileY(agent.y),
+        duration: moving ? 74 : 30,
+        ease: "Sine.easeOut",
+        onUpdate: () => {
+          visual.container.setDepth(3000 + visual.container.y);
+        },
+      });
+    }
 
     const label = ACTION_LABELS[agent.event] ??
       (agent.event.startsWith("build_shelter") ? "BUILDING" : undefined);
-    if (label && step - visual.bubbleCooldownStep >= 13) {
+    if (!this.isSeeking && label && step - visual.bubbleCooldownStep >= 13) {
       visual.bubbleCooldownStep = step;
       this.showActionBubble(visual, label);
       this.spawnActionParticles(visual.container.x, visual.container.y, agent.event);
@@ -563,7 +618,21 @@ export class ReplayScene extends Phaser.Scene {
     let targetY = this.tileY(camp.y);
     let targetZoom = 0.78;
 
-    if (step < 24) {
+    const cue = this.cameraCues.find(
+      (value) => value.start_tick <= step && step <= value.end_tick,
+    );
+    const followed = this.followedAgent
+      ? this.agentVisuals.get(this.followedAgent)
+      : undefined;
+    if (followed) {
+      targetX = followed.container.x;
+      targetY = followed.container.y;
+      targetZoom = 1.24;
+    } else if (cue) {
+      targetX = this.tileX(cue.target.x);
+      targetY = this.tileY(cue.target.y);
+      targetZoom = cue.zoom;
+    } else if (step < 24) {
       targetZoom = 0.68;
     } else if (step < 60) {
       const agent = this.agentVisuals.get(this.firstDepositAgent);
@@ -614,6 +683,48 @@ export class ReplayScene extends Phaser.Scene {
     camera.centerOn(this.tileX(camp.x), this.tileY(camp.y));
   }
 
+  private installCameraControls() {
+    const camera = this.cameras.main;
+    let dragging = false;
+    let previousX = 0;
+    let previousY = 0;
+    this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      dragging = true;
+      previousX = pointer.x;
+      previousY = pointer.y;
+    });
+    this.input.on("pointerup", () => {
+      dragging = false;
+    });
+    this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
+      if (!dragging) return;
+      this.automaticCamera = false;
+      this.followedAgent = null;
+      camera.scrollX -= (pointer.x - previousX) / camera.zoom;
+      camera.scrollY -= (pointer.y - previousY) / camera.zoom;
+      previousX = pointer.x;
+      previousY = pointer.y;
+      this.hooks.onManualCamera?.();
+    });
+    this.input.on(
+      "wheel",
+      (
+        _pointer: Phaser.Input.Pointer,
+        _objects: Phaser.GameObjects.GameObject[],
+        _deltaX: number,
+        deltaY: number,
+      ) => {
+        this.automaticCamera = false;
+        this.followedAgent = null;
+        camera.zoom = Phaser.Math.Clamp(camera.zoom - Math.sign(deltaY) * 0.08, 0.55, 1.6);
+        this.hooks.onManualCamera?.();
+      },
+    );
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.removeAllListeners();
+    });
+  }
+
   private resolveStoryAgents() {
     const depositFrame = this.replay.frames.find((frame) =>
       frame.agents.some((agent) => agent.event.startsWith("deposit_")),
@@ -633,20 +744,30 @@ export class ReplayScene extends Phaser.Scene {
       .rectangle(0, 0, 430, 118, 0x12231c, 0.94)
       .setStrokeStyle(4, 0xf1c866, 1);
     const title = this.add
-      .text(0, -20, "10 / 10 SURVIVED", {
+      .text(
+        0,
+        -20,
+        `${this.replay.summary.survivors} / ${this.replay.world.initial.agents.length} SURVIVED`,
+        {
         fontFamily: '"Press Start 2P"',
         fontSize: "22px",
         color: "#fff0c6",
         align: "center",
-      })
+        },
+      )
       .setOrigin(0.5);
     const caption = this.add
-      .text(0, 26, "SHELTER COMPLETE · 16 ACHIEVEMENTS", {
+      .text(
+        0,
+        26,
+        `${Math.round(this.currentCamp.shelter_progress * 100)}% SHELTER · ${this.replay.summary.achievements.length} ACHIEVEMENTS`,
+        {
         fontFamily: '"Press Start 2P"',
         fontSize: "9px",
         color: "#8fd68a",
         align: "center",
-      })
+        },
+      )
       .setOrigin(0.5);
     this.finale = this.add
       .container(640, 382, [panel, title, caption])

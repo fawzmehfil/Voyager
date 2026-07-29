@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
+from voyager.replay.recorder import record_checkpoint_episode
 from voyager.training.ppo import PPOConfig, PPOTrainer, PPOUpdateStats
 
 
@@ -34,6 +36,18 @@ def parse_args() -> argparse.Namespace:
         choices=("dense", "achievement", "none"),
         default="dense",
     )
+    parser.add_argument(
+        "--record-final-replay",
+        action="store_true",
+        help="Record one post-training evaluation episode, never the training trajectory.",
+    )
+    parser.add_argument("--replay-seed", type=int, default=10_000_010)
+    parser.add_argument(
+        "--replay-manifest",
+        type=Path,
+        default=Path("benchmarks/manifests/stage5_6_final.json"),
+    )
+    parser.add_argument("--replay-output", type=Path, default=Path("runs/replays"))
     parser.add_argument(
         "--no-action-mask",
         action="store_true",
@@ -105,6 +119,19 @@ def main() -> int:
     stats = trainer.train(on_update=_print_update)
     if config.checkpoint_dir is not None:
         print(f"latest checkpoint: {config.checkpoint_dir}/latest")
+    if args.record_final_replay:
+        if config.checkpoint_dir is None:
+            print("--record-final-replay requires checkpoint saving.", file=sys.stderr)
+            return 1
+        replay = record_checkpoint_episode(
+            args.replay_manifest,
+            checkpoint=Path(config.checkpoint_dir) / "latest",
+            seed=args.replay_seed,
+            output_root=args.replay_output,
+            policy_id=f"ppo_training_seed{config.seed}_deterministic",
+            tags=("post-training",),
+        )
+        print(f"post-training replay: {replay}")
     print(f"completed updates: {len(stats)}")
     return 0
 

@@ -1,0 +1,100 @@
+{
+  "cues": [
+    {
+      "end_tick": 23,
+      "kind": "overview",
+      "label": "The island",
+      "start_tick": 0,
+      "target": {
+        "x": 15.0,
+        "y": 14.8
+      },
+      "zoom": 0.66
+    },
+    {
+      "end_tick": 51,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 24,
+      "target": {
+        "x": 10,
+        "y": 13
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 87,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 52,
+      "target": {
+        "x": 19,
+        "y": 18
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 123,
+      "importance": 70,
+      "kind": "event",
+      "label": "all_active_agents_alive_100",
+      "start_tick": 100,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 159,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 124,
+      "target": {
+        "x": 6,
+        "y": 11
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 224,
+      "importance": 90,
+      "kind": "event",
+      "label": "Storm Started",
+      "start_tick": 200,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 0.78
+    },
+    {
+      "end_tick": 260,
+      "importance": 85,
+      "kind": "event",
+      "label": "Storm Ended",
+      "start_tick": 225,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 0.78
+    },
+    {
+      "end_tick": 300,
+      "kind": "finale",
+      "label": "The survivors",
+      "start_tick": 276,
+      "target": {
+        "x": 15,
+        "y": 15
+      },
+      "zoom": 0.72
+    }
+  ],
+  "mode": "automatic",
+  "version": "camera_director_1.0.0"
+}

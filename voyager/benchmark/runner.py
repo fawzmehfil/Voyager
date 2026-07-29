@@ -47,6 +47,40 @@ def load_manifest(path: str | Path) -> BenchmarkManifest:
     return BenchmarkManifest.model_validate(payload)
 
 
+def validate_manifest(manifest: BenchmarkManifest, repository_root: Path) -> None:
+    """Public shared validation used by benchmark and replay workflows."""
+
+    _validate_manifest(manifest, repository_root)
+
+
+def build_policy_runtime(
+    spec: PolicySpec,
+    seed: int,
+    repository_root: Path,
+    runtimes: dict[str, Policy],
+) -> Policy:
+    """Construct/reset one validated policy for evaluation or recording."""
+
+    return _policy_runtime(spec, seed, repository_root, runtimes)
+
+
+def decide_many(
+    policy: Policy,
+    agent_ids: tuple[str, ...],
+    observations: dict[str, dict[str, np.ndarray]],
+    infos: dict[str, dict[str, Any]],
+) -> dict[str, PolicyDecision]:
+    """Run batched inference when available and retain baseline compatibility."""
+
+    return _decide_many(policy, agent_ids, observations, infos)
+
+
+def repository_root(path: Path) -> Path:
+    """Resolve a repository root for shared benchmark/replay workflows."""
+
+    return _repository_root(path)
+
+
 def run_benchmark(
     manifest_path: str | Path,
     output_dir: str | Path,

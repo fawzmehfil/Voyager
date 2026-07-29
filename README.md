@@ -2,7 +2,7 @@
 
 Voyager is a Python-first multi-agent reinforcement learning environment for a stranded-island survival economy, paired with a web-based replay/demo layer. The project is inspired by the compact survival benchmark shape of Crafter: a small world, clear environment stepping, achievements, recorded runs, and behavior that can be inspected visually.
 
-Stage 5.6 validates three frozen two-million-agent-step TensorFlow PPO policies on 100 held-out seeds each. Across the 300 official deterministic PPO episodes, every run retained 10/10 survivors and completed the shelter. The hierarchical-bootstrap civilization score is 89.42 (95% CI 84.19-93.17). Stage 6 adds the recorder and web replay.
+Stage 5.6 validates three frozen two-million-agent-step TensorFlow PPO policies on 100 held-out seeds each. Across the 300 official deterministic PPO episodes, every run retained 10/10 survivors and completed the shelter. The hierarchical-bootstrap civilization score is 89.42 (95% CI 84.19-93.17). Stage 6 turns those trajectories into a versioned saved-replay platform and a game-like web viewer.
 
 ## Why This Exists
 
@@ -56,7 +56,7 @@ The multi-agent environment supports seeded reset/step loops, roles, shared map 
 - Stage 5: TensorFlow PPO training.
 - Stage 5.5: Action masking, entropy decay, economy/group reward shaping, and three reference training runs. Complete.
 - Stage 5.6: Held-out seeds, achievement success rates, civilization score, benchmark exports, and ablation support. Complete.
-- Stage 6: Versioned recorder, replay loader, API, and interactive web viewer. Next.
+- Stage 6: Versioned recorder, random-access loader, API, curated run library, comparison, presentation mode, and interactive pixel-art viewer. Complete.
 - Stage 7: Real days, shared campfire-to-rescue progression, stronger roles, and procedural scenario families.
 - Stage 8: Recurrent PPO, MAPPO-style centralized critic, and optional pixel/hybrid observations.
 - Stage 9: Research showcase and notable runs.
@@ -154,9 +154,58 @@ python examples/run_benchmark.py \
 
 The environment also exposes `VoyagerReward-v0`, `VoyagerAchievement-v0`, and `VoyagerNoReward-v0`, plus training flags for action-mask, reward-component, and role-observation ablations.
 
-After replay infrastructure is stable, the environment will add real days and a compact shared progression from campfire through shelter, storage, renewable resources, and a rescue signal or raft. Longer one-, three-, ten-, and thirty-day tasks will be introduced through curriculum training.
+Stage 7 can now add real days and a compact shared progression from campfire through shelter, storage, renewable resources, and a rescue signal or raft without redesigning the replay contract. Longer one-, three-, ten-, and thirty-day tasks will be introduced through curriculum training.
 
-## Frontend Setup
+## Stage 6 Replay Platform
+
+Stage 6 records simulation output into `stage6_replay_2.0.0`, a portable directory format:
+
+```text
+manifest.json
+initial.json.gz
+timeline/000001-000100.json.gz
+snapshots/000000.json.gz
+metrics.json.gz
+camera.json
+```
+
+Timeline chunks are 100 ticks, reconstruction snapshots are every 25 ticks, and every artifact has a SHA-256 checksum. Readers do not import TensorFlow or execute environment rules. Unknown minor fields and namespaced extensions are safe, while unknown major versions fail clearly.
+
+Record and inspect a versioned policy/seed pair:
+
+```bash
+voyager-replay record \
+  --manifest benchmarks/manifests/stage5_6_final.json \
+  --policy ppo_seed0_deterministic \
+  --seed 10000010 \
+  --tag local
+
+voyager-replay list
+voyager-replay inspect runs/replays/<replay-id>
+voyager-replay validate --deep runs/replays/<replay-id>
+```
+
+An arbitrary compatible training checkpoint can be recorded with `--checkpoint checkpoints/stage5/latest`. Training also supports `--record-final-replay`; evaluation and benchmark commands support explicit `--record-replay POLICY:SEED` hooks. Training records only a post-training evaluation, never the training trajectory.
+
+Five validated seed-matched recordings live under `benchmarks/replays/stage6_curated_v1/`: random, greedy, cooperative, deterministic PPO, and stochastic PPO. Their compressed total is approximately 1.1 MB. The deterministic PPO replay is the default showcase; the cooperative replay is intentionally retained as an honest failure case. The original Stage 6A JSON remains a permanent compatibility and visual-regression fixture.
+
+Run the unified read-only application:
+
+```bash
+voyager-web
+```
+
+It serves the API and the production React build from `http://127.0.0.1:8000`. Useful routes are:
+
+- `/` — polished default showcase.
+- `/replays/{replay_id}` — general viewer with optional inspection.
+- `/compare?left=random&right=ppo_seed0_deterministic` — synchronized same-seed comparison.
+- `/present/{replay_id}` — fixed, chrome-free capture mode.
+- `/api/v1/replays` — filtered and cursor-paginated replay catalog.
+
+Configure catalog roots with a path-separated `VOYAGER_REPLAY_ROOTS` value. `VOYAGER_HOST`, `VOYAGER_PORT`, `VOYAGER_FRONTEND_DIR`, and `VOYAGER_REPLAY_CACHE_SIZE` configure the server. The web service is deliberately read-only: new recordings enter through the recorder CLI or workflow hooks.
+
+## Frontend Development
 
 ```bash
 cd web
@@ -174,4 +223,13 @@ For a production build:
 
 ```bash
 npm run build
+```
+
+Vite proxies `/api/v1` and `/healthz` to a local `voyager-web` process. The renderer uses crisp procedural 16-pixel art, nearest-neighbor scaling, modular chibi agents, semantic action/event animation, deterministic camera direction, exact seeking, and no browser-side simulation.
+
+Build and run the single-process production container:
+
+```bash
+docker build -t voyager .
+docker run --rm -p 8000:8000 voyager
 ```

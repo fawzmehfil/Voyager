@@ -1,1 +1,5 @@
-"""FastAPI server package for future replay and live-simulation endpoints."""
+"""Self-hostable Voyager replay API and frontend server."""
+
+from .app import create_app
+
+__all__ = ["create_app"]
