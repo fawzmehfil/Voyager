@@ -18,6 +18,7 @@ import type { CameraCue } from "./platformTypes";
 
 const TILE_SIZE = 48;
 const ART_SCALE = 3;
+const OCEAN_APRON_TILES = 18;
 const ACHIEVEMENT_LABELS: Record<string, string> = {
   shelter_25_percent: "SHELTER FRAME RAISED",
   shelter_50_percent: "SHELTER HALF BUILT",
@@ -93,6 +94,8 @@ export class ReplayScene extends Phaser.Scene {
   private firstDepositAgent = "";
   private sharingAgent = "";
   private cameraCues: CameraCue[];
+  private worldCenterX = 0;
+  private worldCenterY = 0;
 
   constructor(replay: ReplayArtifact, hooks: ReplayHooks, cameraCues: CameraCue[] = []) {
     super({ key: "VoyagerReplay" });
@@ -220,7 +223,34 @@ export class ReplayScene extends Phaser.Scene {
     const { width, height, initial } = this.replay.world;
     const worldWidth = width * TILE_SIZE;
     const worldHeight = height * TILE_SIZE;
-    this.cameras.main.setBounds(-160, -120, worldWidth + 320, worldHeight + 240);
+    const oceanApron = OCEAN_APRON_TILES * TILE_SIZE;
+    this.worldCenterX = worldWidth / 2;
+    this.worldCenterY = worldHeight / 2;
+    this.cameras.main.setBounds(
+      -oceanApron,
+      -oceanApron,
+      worldWidth + oceanApron * 2,
+      worldHeight + oceanApron * 2,
+    );
+
+    for (let y = -OCEAN_APRON_TILES; y < height + OCEAN_APRON_TILES; y += 1) {
+      for (let x = -OCEAN_APRON_TILES; x < width + OCEAN_APRON_TILES; x += 1) {
+        if (x >= 0 && x < width && y >= 0 && y < height) continue;
+        const variant = tileVariant(
+          x + OCEAN_APRON_TILES,
+          y + OCEAN_APRON_TILES,
+        );
+        const tile = this.add
+          .image(
+            x * TILE_SIZE + TILE_SIZE / 2,
+            y * TILE_SIZE + TILE_SIZE / 2,
+            `terrain-water-${variant}`,
+          )
+          .setScale(ART_SCALE)
+          .setDepth(0);
+        this.waterTiles.push(tile);
+      }
+    }
 
     initial.terrain.forEach((row, y) => {
       row.forEach((terrain, x) => {
@@ -322,20 +352,22 @@ export class ReplayScene extends Phaser.Scene {
         .setScale(1.25);
       const name = this.add
         .text(-11, -31, agent.name.toUpperCase(), {
-          fontFamily: '"Press Start 2P"',
-          fontSize: "7px",
+          fontFamily: '"IBM Plex Mono"',
+          fontSize: "12px",
+          fontStyle: "600",
           color: "#fff3d2",
           backgroundColor: "#15231de6",
-          padding: { x: 4, y: 3 },
+          padding: { x: 4, y: 2 },
         })
         .setOrigin(0, 0.5);
       const bubble = this.add
         .text(0, -48, "", {
-          fontFamily: '"Press Start 2P"',
-          fontSize: "7px",
+          fontFamily: '"IBM Plex Mono"',
+          fontSize: "13px",
+          fontStyle: "600",
           color: "#19251f",
           backgroundColor: "#fff0c6",
-          padding: { x: 5, y: 4 },
+          padding: { x: 6, y: 3 },
         })
         .setOrigin(0.5, 1)
         .setVisible(false);
@@ -362,21 +394,22 @@ export class ReplayScene extends Phaser.Scene {
 
   private createWeather() {
     this.stormShade = this.add
-      .rectangle(0, 0, 1280, 720, 0x102735, 0)
+      .rectangle(0, 0, 1280, 720, 0x102735, 1)
       .setOrigin(0)
-      .setScrollFactor(0)
+      .setAlpha(0)
       .setDepth(9000);
-    for (let index = 0; index < 72; index += 1) {
+    for (let index = 0; index < 116; index += 1) {
+      const screenX = (index * 173 + 47) % 1280;
+      const screenY = (index * 97 + 31) % 720;
+      const baseScale = index % 4 === 0 ? 4 : 3;
       const drop = this.add
-        .image(
-          (index * 173 + 47) % 1280,
-          (index * 97 + 31) % 720,
-          "pixel-rain",
-        )
-        .setScale(3)
-        .setAlpha(0.76)
-        .setScrollFactor(0)
+        .image(screenX, screenY, "pixel-rain")
+        .setScale(baseScale)
+        .setAlpha(index % 5 === 0 ? 0.95 : 0.84)
         .setDepth(9001)
+        .setData("screenX", screenX)
+        .setData("screenY", screenY)
+        .setData("baseScale", baseScale)
         .setVisible(false);
       this.rain.push(drop);
     }
@@ -570,7 +603,7 @@ export class ReplayScene extends Phaser.Scene {
     this.currentStorm = storm;
     this.tweens.add({
       targets: this.stormShade,
-      alpha: storm ? 0.48 : 0,
+      alpha: storm ? 0.6 : 0,
       duration: 500,
       ease: "Sine.easeInOut",
     });
@@ -579,6 +612,12 @@ export class ReplayScene extends Phaser.Scene {
   }
 
   private updateAmbientAnimation(delta: number) {
+    const camera = this.cameras.main;
+    const view = camera.worldView;
+    this.stormShade
+      ?.setPosition(view.x, view.y)
+      .setDisplaySize(view.width, view.height);
+
     const waterFrame = Math.floor(this.animationClock / 480) % 2;
     if (waterFrame !== this.waterFrame) {
       this.waterFrame = waterFrame;
@@ -603,10 +642,18 @@ export class ReplayScene extends Phaser.Scene {
 
     if (this.currentStorm) {
       this.rain.forEach((drop, index) => {
-        drop.x -= delta * 0.18;
-        drop.y += delta * 0.46;
-        if (drop.y > 730) drop.y = -20 - (index % 7) * 9;
-        if (drop.x < -10) drop.x = 1290;
+        let screenX = Number(drop.getData("screenX")) - delta * 0.18;
+        let screenY = Number(drop.getData("screenY")) + delta * 0.46;
+        if (screenY > 730) screenY = -20 - (index % 7) * 9;
+        if (screenX < -10) screenX = 1290;
+        drop
+          .setData("screenX", screenX)
+          .setData("screenY", screenY)
+          .setPosition(
+            view.x + screenX / camera.zoom,
+            view.y + screenY / camera.zoom,
+          )
+          .setScale(Number(drop.getData("baseScale")) / camera.zoom);
       });
     }
   }
@@ -669,6 +716,10 @@ export class ReplayScene extends Phaser.Scene {
     }
 
     const camera = this.cameras.main;
+    if (targetZoom <= 0.76) {
+      targetX = this.worldCenterX;
+      targetY = this.worldCenterY;
+    }
     camera.zoom = Phaser.Math.Linear(camera.zoom, targetZoom, 0.025);
     const desiredX = targetX - camera.width / (2 * camera.zoom);
     const desiredY = targetY - camera.height / (2 * camera.zoom);
@@ -677,10 +728,9 @@ export class ReplayScene extends Phaser.Scene {
   }
 
   private setCameraImmediately() {
-    const camp = this.replay.world.initial.camp;
     const camera = this.cameras.main;
     camera.setZoom(0.68);
-    camera.centerOn(this.tileX(camp.x), this.tileY(camp.y));
+    camera.centerOn(this.worldCenterX, this.worldCenterY);
   }
 
   private installCameraControls() {
@@ -717,6 +767,9 @@ export class ReplayScene extends Phaser.Scene {
         this.automaticCamera = false;
         this.followedAgent = null;
         camera.zoom = Phaser.Math.Clamp(camera.zoom - Math.sign(deltaY) * 0.08, 0.55, 1.6);
+        if (camera.zoom <= 0.63) {
+          camera.centerOn(this.worldCenterX, this.worldCenterY);
+        }
         this.hooks.onManualCamera?.();
       },
     );
@@ -749,10 +802,10 @@ export class ReplayScene extends Phaser.Scene {
         -20,
         `${this.replay.summary.survivors} / ${this.replay.world.initial.agents.length} SURVIVED`,
         {
-        fontFamily: '"Press Start 2P"',
-        fontSize: "22px",
-        color: "#fff0c6",
-        align: "center",
+          fontFamily: '"Press Start 2P"',
+          fontSize: "22px",
+          color: "#fff0c6",
+          align: "center",
         },
       )
       .setOrigin(0.5);
@@ -762,10 +815,11 @@ export class ReplayScene extends Phaser.Scene {
         26,
         `${Math.round(this.currentCamp.shelter_progress * 100)}% SHELTER · ${this.replay.summary.achievements.length} ACHIEVEMENTS`,
         {
-        fontFamily: '"Press Start 2P"',
-        fontSize: "9px",
-        color: "#8fd68a",
-        align: "center",
+          fontFamily: '"IBM Plex Mono"',
+          fontSize: "17px",
+          fontStyle: "600",
+          color: "#9ee497",
+          align: "center",
         },
       )
       .setOrigin(0.5);

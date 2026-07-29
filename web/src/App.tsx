@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { loadCatalog } from "./replay/ReplaySource";
 import type { CatalogReplay } from "./replay/platformTypes";
 import type { ReplayStatus } from "./replay/types";
@@ -30,14 +30,8 @@ function ShowcasePage() {
   return (
     <main className="page-shell">
       <header className="page-intro">
-        <div>
-          <p className="eyebrow">STAGE 6 · SAVED CIVILIZATIONS</p>
-          <h1>VOYAGER</h1>
-        </div>
+        <h1>VOYAGER</h1>
         <div className="intro-actions">
-          <p>
-            TEN AGENTS. ONE ISLAND. <span>25 SECONDS TO BUILD A CIVILIZATION.</span>
-          </p>
           <button type="button" onClick={() => setCatalogOpen((open) => !open)}>
             {catalogOpen ? "CLOSE RUNS" : "EXPLORE RUNS"}
           </button>
@@ -261,7 +255,7 @@ function RunLibrary() {
             <IslandThumbnail replayId={run.replay_id} />
             <small>{run.policy_kind.toUpperCase()} · SEED {run.seed.toLocaleString()}</small>
             <strong>{run.policy_id.replaceAll("_", " ")}</strong>
-            <div>
+            <div className="run-stats">
               <span>{run.terminal_summary.survivors} SURVIVED</span>
               <span>{run.terminal_summary.achievements.length} ACHIEVEMENTS</span>
             </div>
@@ -279,39 +273,72 @@ function RunLibrary() {
   );
 }
 
+interface ThumbnailInitial {
+  terrain: string[][];
+  camp: { x: number; y: number };
+}
+
+const thumbnailInitialCache = new Map<string, Promise<ThumbnailInitial>>();
+
+function loadThumbnailInitial(replayId: string) {
+  const cached = thumbnailInitialCache.get(replayId);
+  if (cached) return cached;
+  const request = fetch(`/api/v1/replays/${encodeURIComponent(replayId)}/initial`)
+    .then((response) => {
+      if (!response.ok) throw new Error(`Thumbnail request failed: ${response.status}`);
+      return response.json() as Promise<ThumbnailInitial>;
+    })
+    .catch((error: unknown) => {
+      thumbnailInitialCache.delete(replayId);
+      throw error;
+    });
+  thumbnailInitialCache.set(replayId, request);
+  return request;
+}
+
 function IslandThumbnail({ replayId }: { replayId: string }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/v1/replays/${encodeURIComponent(replayId)}/initial`)
-      .then((response) => response.json())
-      .then((initial: { terrain: string[][]; camp: { x: number; y: number } }) => {
-        if (cancelled || !canvas.current) return;
-        const context = canvas.current.getContext("2d");
-        if (!context) return;
-        context.imageSmoothingEnabled = false;
-        const colors: Record<string, string> = {
-          water: "#287d86",
-          beach: "#dba45e",
-          grass: "#4a9346",
-          forest: "#286a39",
-          quarry: "#68736a",
-        };
-        initial.terrain.forEach((row, y) =>
-          row.forEach((terrain, x) => {
-            context.fillStyle = colors[terrain] ?? "#8a5ca0";
-            context.fillRect(x, y, 1, 1);
-          }),
-        );
-        context.fillStyle = "#f0c65d";
-        context.fillRect(initial.camp.x - 1, initial.camp.y - 1, 3, 3);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [replayId]);
-  return <canvas className="island-thumbnail" width={32} height={32} aria-hidden="true" />;
+  const drawThumbnail = useCallback(
+    (target: HTMLCanvasElement | null) => {
+      if (!target) return;
+      void loadThumbnailInitial(replayId)
+        .then((initial) => {
+          if (!target.isConnected) return;
+          const context = target.getContext("2d");
+          if (!context) return;
+          context.imageSmoothingEnabled = false;
+          const colors: Record<string, string> = {
+            water: "#287d86",
+            beach: "#dba45e",
+            grass: "#4a9346",
+            forest: "#286a39",
+            quarry: "#68736a",
+          };
+          initial.terrain.forEach((row, y) =>
+            row.forEach((terrain, x) => {
+              context.fillStyle = colors[terrain] ?? "#8a5ca0";
+              context.fillRect(x, y, 1, 1);
+            }),
+          );
+          context.fillStyle = "#f0c65d";
+          context.fillRect(initial.camp.x - 1, initial.camp.y - 1, 3, 3);
+          target.dataset.ready = "true";
+        })
+        .catch((error: unknown) => {
+          target.dataset.error =
+            error instanceof Error ? error.message : "Thumbnail unavailable";
+        });
+    },
+    [replayId],
+  );
+  return (
+    <canvas
+      ref={drawThumbnail}
+      className="island-thumbnail"
+      width={32}
+      height={32}
+      aria-hidden="true"
+    />
+  );
 }
 
 function CompactHeader({ replayId }: { replayId: string }) {

@@ -10,15 +10,16 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.3.0",
     "@fontsource/press-start-2p": "^5.3.0",
     "phaser": "^3.90.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^5.0.4",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^5.0.4",
     "jsdom": "^26.1.0",
     "typescript": "^5.8.3",
     "vite": "^7.0.5",
