@@ -20,6 +20,14 @@ def register_envs() -> None:
             disable_env_checker=True,
         )
 
+    if "VoyagerCivilization-v1" not in registry:
+        register(
+            id="VoyagerCivilization-v1",
+            entry_point="voyager.envs.civilization:VoyagerCivilizationEnv",
+            order_enforce=False,
+            disable_env_checker=True,
+        )
+
     reward_envs = {
         "VoyagerReward-v0": "dense",
         "VoyagerAchievement-v0": "achievement",

@@ -4,6 +4,13 @@ Voyager is a Python-first multi-agent reinforcement learning environment for a s
 
 Stage 5.6 validates three frozen two-million-agent-step TensorFlow PPO policies on 100 held-out seeds each. Across the 300 official deterministic PPO episodes, every run retained 10/10 survivors and completed the shelter. The hierarchical-bootstrap civilization score is 89.42 (95% CI 84.19-93.17). Stage 6 turns those trajectories into a versioned saved-replay platform and a game-like web viewer.
 
+Stage 7A expands that same simulator into a deterministic 48×48 handcrafted island without
+removing the compact benchmark. `VoyagerCivilization-v1` adds structured actions, a
+workbench-to-spear-to-hunt-to-cooking progression, joint construction, a fueled campfire,
+six-person shelter occupancy, and one-or-two seeded night stalkers whose 25-damage attacks
+can be mitigated or suppressed through coordinated defense. The committed Replay 2.1
+vertical slice runs for 600 ticks at two ticks per second.
+
 ## Why This Exists
 
 Voyager is an RL environment where agents learn to survive under scarcity. The current environment models agents stranded on an island with food, wood, stone, hunger, energy, shared camp storage, shelter construction, storms, and role specialization. The same runs should also be easy to showcase in a browser, with replay controls, agent panels, event timelines, and metrics.
@@ -226,6 +233,17 @@ npm run build
 ```
 
 Vite proxies `/api/v1` and `/healthz` to a local `voyager-web` process. The renderer uses crisp procedural 16-pixel art, nearest-neighbor scaling, modular chibi agents, semantic action/event animation, deterministic camera direction, exact seeking, and no browser-side simulation.
+
+Generate the Stage 7A reachability artifact with:
+
+```bash
+python examples/generate_stage7a_replay.py
+voyager-web
+```
+
+Then open `/replays/civilization_vertical_slice_v1`. The replay remains simulation-free in
+the browser: structures, shelter occupancy, deer, stalkers, night lighting, attacks,
+mitigation, and defeats are all rendered from recorded facts.
 
 Build and run the single-process production container:
 

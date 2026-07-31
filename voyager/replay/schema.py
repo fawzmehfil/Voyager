@@ -7,6 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 REPLAY_SCHEMA_VERSION = "stage6_replay_2.0.0"
+CIVILIZATION_REPLAY_SCHEMA_VERSION = "stage7_replay_2.1.0"
 LEGACY_REPLAY_SCHEMA_VERSION = "stage6_replay_1.0.0"
 TIMELINE_CHUNK_SIZE = 100
 SNAPSHOT_INTERVAL = 25
@@ -95,8 +96,9 @@ class ReplayManifest(ExtensibleModel):
 
 
 def replay_major(version: str) -> int:
-    prefix = "stage6_replay_"
-    if not version.startswith(prefix):
+    prefixes = ("stage6_replay_", "stage7_replay_")
+    prefix = next((value for value in prefixes if version.startswith(value)), None)
+    if prefix is None:
         raise ValueError(f"Unrecognized replay version {version!r}.")
     try:
         return int(version[len(prefix) :].split(".", maxsplit=1)[0])

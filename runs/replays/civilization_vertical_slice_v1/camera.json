@@ -1,0 +1,28 @@
+{
+  "cues": [
+    {
+      "end_tick": 24,
+      "kind": "overview",
+      "label": "The island",
+      "start_tick": 0,
+      "target": {
+        "x": 24.2,
+        "y": 31.0
+      },
+      "zoom": 0.66
+    },
+    {
+      "end_tick": 600,
+      "kind": "finale",
+      "label": "The survivors",
+      "start_tick": 576,
+      "target": {
+        "x": 24,
+        "y": 31
+      },
+      "zoom": 0.72
+    }
+  ],
+  "mode": "automatic",
+  "version": "camera_director_1.0.0"
+}

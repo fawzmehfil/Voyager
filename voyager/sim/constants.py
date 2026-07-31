@@ -11,6 +11,8 @@ class Terrain(IntEnum):
     GRASS = 2
     FOREST = 3
     QUARRY = 4
+    ROCKY_HIGHLAND = 5
+    CAVE = 6
 
 
 class Resource(IntEnum):

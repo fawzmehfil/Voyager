@@ -35,10 +35,14 @@ def generate_island(map_size: int, rng: np.random.Generator) -> WorldState:
     terrain[quarry_mask] = Terrain.QUARRY
 
     resource_ids[forest_mask] = Resource.WOOD
-    resource_quantities[forest_mask] = rng.integers(2, 5, size=int(forest_mask.sum()), dtype=np.uint8)
+    resource_quantities[forest_mask] = rng.integers(
+        2, 5, size=int(forest_mask.sum()), dtype=np.uint8
+    )
 
     resource_ids[quarry_mask] = Resource.STONE
-    resource_quantities[quarry_mask] = rng.integers(2, 5, size=int(quarry_mask.sum()), dtype=np.uint8)
+    resource_quantities[quarry_mask] = rng.integers(
+        2, 5, size=int(quarry_mask.sum()), dtype=np.uint8
+    )
 
     food_mask = (terrain == Terrain.GRASS) & (rng.random((map_size, map_size)) < 0.14)
     resource_ids[food_mask] = Resource.FOOD

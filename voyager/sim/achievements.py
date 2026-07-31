@@ -17,6 +17,15 @@ ACHIEVEMENT_IDS = (
     "all_roles_contributed",
     "shared_food_transfer",
     "no_deaths_run",
+    "workbench_complete",
+    "first_spear_crafted",
+    "first_successful_hunt",
+    "first_cooked_meal",
+    "campfire_full_night",
+    "full_shelter_protected_night",
+    "joint_construction_multiple_roles",
+    "first_stalker_defeated",
+    "first_ally_defense_kill",
 )
 
 ACHIEVEMENT_SET = frozenset(ACHIEVEMENT_IDS)

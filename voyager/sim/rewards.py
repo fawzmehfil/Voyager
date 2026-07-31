@@ -16,6 +16,11 @@ DENSE_REWARD_COMPONENTS = frozenset(
         "shelter_progress",
         "team_death",
         "episode_survival",
+        "tool_progression",
+        "food_preparation",
+        "public_infrastructure",
+        "joint_work",
+        "defense",
     }
 )
 

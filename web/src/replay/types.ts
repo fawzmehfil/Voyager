@@ -1,11 +1,43 @@
-export type TerrainType = "water" | "beach" | "grass" | "forest" | "quarry";
-export type ResourceType = "none" | "food" | "wood" | "stone";
+export type TerrainType = "water" | "beach" | "grass" | "forest" | "quarry" | "rocky_highland" | "cave";
+export type ResourceType = "none" | "food" | "wood" | "stone" | "raw_meat" | "cooked_meat";
 export type AgentRole = "forager" | "woodcutter" | "builder";
 
 export interface Stockpile {
   food: number;
   wood: number;
   stone: number;
+  raw_meat?: number;
+  cooked_meat?: number;
+}
+
+export interface ReplayStructure {
+  id: string;
+  type: "workbench" | "campfire" | "shelter" | string;
+  x: number;
+  y: number;
+  progress: number;
+  complete: boolean;
+  fuel?: number;
+  capacity?: number;
+  occupants?: string[];
+}
+
+export interface ReplayCreature {
+  id: string;
+  type: "island_deer" | "night_stalker" | string;
+  x: number;
+  y: number;
+  health: number;
+  max_health: number;
+  alive: boolean;
+  behavior?: string;
+}
+
+export interface ReplayTime {
+  day: number;
+  tick_in_day: number;
+  phase: "morning" | "afternoon" | "night";
+  ambient_light: number;
 }
 
 export interface ReplayCamp {
@@ -53,6 +85,9 @@ export interface ReplayFrame {
   agents: ReplayAgent[];
   resource_changes: ReplayResource[];
   new_achievements: string[];
+  structures?: ReplayStructure[];
+  creatures?: ReplayCreature[];
+  time?: ReplayTime | null;
 }
 
 export interface ReplayArtifact {
@@ -80,6 +115,9 @@ export interface ReplayArtifact {
       resources: ReplayResource[];
       camp: ReplayCamp;
       agents: ReplayAgent[];
+      structures?: ReplayStructure[];
+      creatures?: ReplayCreature[];
+      time?: ReplayTime | null;
     };
   };
   frames: ReplayFrame[];

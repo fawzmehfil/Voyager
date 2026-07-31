@@ -10,6 +10,8 @@ import type {
   ReplayArtifact,
   ReplayCamp,
   ReplayFrame,
+  ReplayStructure,
+  ReplayCreature,
   ReplayResource,
   ReplayStatus,
   TerrainType,
@@ -83,6 +85,9 @@ export class ReplayScene extends Phaser.Scene {
   private woodPile?: Phaser.GameObjects.Image;
   private stonePile?: Phaser.GameObjects.Image;
   private stormShade?: Phaser.GameObjects.Rectangle;
+  private nightShade?: Phaser.GameObjects.Rectangle;
+  private structureVisuals = new Map<string, Phaser.GameObjects.Container>();
+  private creatureVisuals = new Map<string, Phaser.GameObjects.Container>();
   private toast?: Phaser.GameObjects.Text;
   private finale?: Phaser.GameObjects.Container;
   private waterFrame = 0;
@@ -112,6 +117,8 @@ export class ReplayScene extends Phaser.Scene {
     this.resolveStoryAgents();
     this.createWorld();
     this.createCamp();
+    this.updateStructures(this.replay.world.initial.structures ?? []);
+    this.updateCreatures(this.replay.world.initial.creatures ?? []);
     this.createAgents(this.replay.world.initial.agents);
     this.createWeather();
     this.createToast();
@@ -184,6 +191,9 @@ export class ReplayScene extends Phaser.Scene {
     this.woodPile = undefined;
     this.stonePile = undefined;
     this.stormShade = undefined;
+    this.nightShade = undefined;
+    this.structureVisuals.clear();
+    this.creatureVisuals.clear();
     this.toast = undefined;
     this.finale = undefined;
     this.scene.restart();
@@ -255,11 +265,13 @@ export class ReplayScene extends Phaser.Scene {
     initial.terrain.forEach((row, y) => {
       row.forEach((terrain, x) => {
         const variant = tileVariant(x, y);
+        const textureTerrain =
+          terrain === "rocky_highland" || terrain === "cave" ? "quarry" : terrain;
         const tile = this.add
           .image(
             x * TILE_SIZE + TILE_SIZE / 2,
             y * TILE_SIZE + TILE_SIZE / 2,
-            `terrain-${terrain}-${variant}`,
+            `terrain-${textureTerrain}-${variant}`,
           )
           .setScale(ART_SCALE)
           .setDepth(terrain === "water" ? 0 : 10);
@@ -393,6 +405,11 @@ export class ReplayScene extends Phaser.Scene {
   }
 
   private createWeather() {
+    this.nightShade = this.add
+      .rectangle(0, 0, 1280, 720, 0x081426, 1)
+      .setOrigin(0)
+      .setAlpha(0)
+      .setDepth(8999);
     this.stormShade = this.add
       .rectangle(0, 0, 1280, 720, 0x102735, 1)
       .setOrigin(0)
@@ -435,6 +452,9 @@ export class ReplayScene extends Phaser.Scene {
     frame.resource_changes.forEach((resource) => this.upsertResource(resource));
     this.updateCamp(frame.camp);
     frame.agents.forEach((agent) => this.updateAgent(agent, frame.step));
+    this.updateStructures(frame.structures ?? []);
+    this.updateCreatures(frame.creatures ?? []);
+    this.setNight(frame.time?.phase === "night");
     if (!this.isSeeking) {
       frame.new_achievements.forEach((achievement) =>
         this.showAchievement(achievement),
@@ -447,6 +467,54 @@ export class ReplayScene extends Phaser.Scene {
     if (frame.step === this.replay.summary.world_steps && !this.isSeeking) {
       this.finishReplay();
     }
+  }
+
+  private updateStructures(structures: ReplayStructure[]) {
+    structures.forEach((structure) => {
+      if (structure.type === "shelter") return;
+      let visual = this.structureVisuals.get(structure.id);
+      if (!visual) {
+        const color = structure.type === "campfire" ? 0xf6a53b : 0x8d5b35;
+        const marker = this.add.rectangle(0, 0, 28, 22, color, 0.95).setStrokeStyle(3, 0x2b2118);
+        const label = this.add.text(0, -22, structure.type.toUpperCase(), {
+          fontFamily: '"IBM Plex Mono"', fontSize: "10px", color: "#fff3d2",
+          backgroundColor: "#15231de6", padding: { x: 3, y: 2 },
+        }).setOrigin(0.5);
+        visual = this.add.container(this.tileX(structure.x), this.tileY(structure.y), [marker, label]);
+        visual.setDepth(2500 + this.tileY(structure.y));
+        this.structureVisuals.set(structure.id, visual);
+      }
+      visual.setAlpha(structure.complete ? 1 : Math.max(0.3, structure.progress));
+    });
+  }
+
+  private updateCreatures(creatures: ReplayCreature[]) {
+    const visible = new Set<string>();
+    creatures.forEach((creature) => {
+      visible.add(creature.id);
+      let visual = this.creatureVisuals.get(creature.id);
+      if (!visual) {
+        const hostile = creature.type === "night_stalker";
+        const body = this.add.rectangle(0, 0, 26, 26, hostile ? 0x7b3fb3 : 0xc88a4a, 1)
+          .setStrokeStyle(3, hostile ? 0xe563ff : 0x4b311f);
+        const eyes = this.add.text(0, 0, hostile ? "••" : "◇", {
+          fontFamily: '"IBM Plex Mono"', fontSize: "13px", color: "#fff3d2",
+        }).setOrigin(0.5);
+        visual = this.add.container(this.tileX(creature.x), this.tileY(creature.y), [body, eyes]);
+        this.creatureVisuals.set(creature.id, visual);
+      }
+      visual.setPosition(this.tileX(creature.x), this.tileY(creature.y));
+      visual.setDepth(2900 + this.tileY(creature.y));
+      visual.setVisible(creature.alive);
+      visual.setAlpha(Math.max(0.35, creature.health / Math.max(1, creature.max_health)));
+    });
+    this.creatureVisuals.forEach((visual, id) => {
+      if (!visible.has(id)) visual.setVisible(false);
+    });
+  }
+
+  private setNight(night: boolean) {
+    this.nightShade?.setAlpha(night ? 0.48 : 0);
   }
 
   private updateAgent(agent: ReplayAgent, step: number) {
@@ -615,6 +683,9 @@ export class ReplayScene extends Phaser.Scene {
     const camera = this.cameras.main;
     const view = camera.worldView;
     this.stormShade
+      ?.setPosition(view.x, view.y)
+      .setDisplaySize(view.width, view.height);
+    this.nightShade
       ?.setPosition(view.x, view.y)
       .setDisplaySize(view.width, view.height);
 

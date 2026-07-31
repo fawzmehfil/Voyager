@@ -9,7 +9,9 @@ from pettingzoo import ParallelEnv
 
 from voyager.sim.constants import ACTION_COUNT, ROLE_COUNT, Resource, Terrain
 from voyager.sim.multi_world import ROLE_IDS, MultiAgentWorld
+from voyager.sim.registries import CivilizationAction
 from voyager.sim.rewards import DENSE_REWARD_COMPONENTS, REWARD_MODES, RewardMode
+from voyager.sim.scenarios import COMPACT_SCENARIO_ID
 
 
 class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
@@ -33,6 +35,7 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
         reward_mode: RewardMode = "dense",
         disabled_reward_components: tuple[str, ...] = (),
         mask_role_observation: bool = False,
+        scenario_id: str = COMPACT_SCENARIO_ID,
         render_mode: str | None = None,
     ) -> None:
         if map_size < 9:
@@ -68,16 +71,17 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
             storm_damage=storm_damage,
             food_regen_interval=food_regen_interval,
             food_spawn_rate=food_spawn_rate,
+            scenario_id=scenario_id,
         )
         self.possible_agents = list(self.world.possible_agents)
         self.agents: list[str] = []
 
         observation_space = self._build_observation_space()
         action_space: spaces.Discrete = spaces.Discrete(ACTION_COUNT)
-        self.observation_spaces = {
+        self.observation_spaces: dict[str, spaces.Space] = {
             agent_id: observation_space for agent_id in self.possible_agents
         }
-        self.action_spaces = {
+        self.action_spaces: dict[str, spaces.Space] = {
             agent_id: action_space for agent_id in self.possible_agents
         }
         self._np_random = np.random.default_rng()
@@ -106,8 +110,11 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
         dict[str, dict[str, Any]],
     ]:
         acting_agents = list(self.agents)
-        results = self.world.step(actions)
-        max_step_reached = self.world.state is not None and self.world.state.step_count >= self.max_steps
+        world_actions: dict[str, int | CivilizationAction] = dict(actions)
+        results = self.world.step(world_actions)
+        max_step_reached = (
+            self.world.state is not None and self.world.state.step_count >= self.max_steps
+        )
 
         selected_components = {
             agent_id: self._selected_reward_components(results[agent_id])
@@ -117,14 +124,8 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
             agent_id: float(sum(selected_components[agent_id].values()))
             for agent_id in acting_agents
         }
-        terminations = {
-            agent_id: results[agent_id].terminated
-            for agent_id in acting_agents
-        }
-        truncations = {
-            agent_id: results[agent_id].truncated
-            for agent_id in acting_agents
-        }
+        terminations = {agent_id: results[agent_id].terminated for agent_id in acting_agents}
+        truncations = {agent_id: results[agent_id].truncated for agent_id in acting_agents}
         infos = {
             agent_id: self._info(
                 agent_id,
@@ -290,6 +291,7 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
         agent = state.agents[agent_id]
         return {
             "event": event,
+            "invalid_action": event.startswith("invalid_"),
             "step": state.step_count,
             "position": (agent.x, agent.y),
             "role": agent.role,

@@ -16,10 +16,55 @@ class AgentState:
     hunger: float = 15.0
     energy: float = 100.0
     alive: bool = True
-    inventory: dict[str, int] = field(
-        default_factory=lambda: {"food": 0, "wood": 0, "stone": 0}
-    )
+    inventory: dict[str, int] = field(default_factory=lambda: {"food": 0, "wood": 0, "stone": 0})
     food_origins: list[str | None] = field(default_factory=list)
+    tools: set[str] = field(default_factory=set)
+    equipped_tool: str | None = None
+    sheltered: bool = False
+
+
+@dataclass(slots=True)
+class StructureState:
+    """One public structure in the shared Stage 7A camp."""
+
+    id: str
+    type: str
+    x: int
+    y: int
+    required_materials: dict[str, int]
+    required_labor: int
+    reserved_materials: dict[str, int] = field(default_factory=dict)
+    labor: int = 0
+    condition: int = 100
+    capacity: int = 0
+    occupants: set[str] = field(default_factory=set)
+    fuel: int = 0
+
+    @property
+    def progress(self) -> float:
+        if self.required_labor <= 0:
+            return 1.0
+        return min(1.0, self.labor / self.required_labor)
+
+    @property
+    def complete(self) -> bool:
+        return self.progress >= 1.0
+
+
+@dataclass(slots=True)
+class CreatureState:
+    """One huntable or hostile non-agent creature."""
+
+    id: str
+    type: str
+    x: int
+    y: int
+    health: int
+    max_health: int
+    alive: bool = True
+    target: str | None = None
+    spawn_tick: int = 0
+    behavior: str = "idle"
 
 
 @dataclass(slots=True)
@@ -39,9 +84,7 @@ class CampState:
 
     x: int
     y: int
-    stockpile: dict[str, int] = field(
-        default_factory=lambda: {"food": 0, "wood": 0, "stone": 0}
-    )
+    stockpile: dict[str, int] = field(default_factory=lambda: {"food": 0, "wood": 0, "stone": 0})
     food_high_watermark: int = 0
     food_origins: list[str] = field(default_factory=list)
     shelter_progress: float = 0.0
@@ -81,3 +124,15 @@ class MultiAgentWorldState:
     max_food_security_steps: int = 0
     shelter_completion_step: int | None = None
     storm_was_active: bool = False
+    scenario_id: str = "stage5_5_standard_300_v1"
+    structures: dict[str, StructureState] = field(default_factory=dict)
+    creatures: dict[str, CreatureState] = field(default_factory=dict)
+    events: list[dict[str, object]] = field(default_factory=list)
+    last_spawn_count: int = 0
+    last_spawn_positions: list[tuple[int, int]] = field(default_factory=list)
+    hunts: int = 0
+    cooked_meals: int = 0
+    monster_defeats: int = 0
+    prevented_damage: int = 0
+    full_fire_night_ticks: int = 0
+    full_shelter_night_ticks: int = 0

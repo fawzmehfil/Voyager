@@ -648,6 +648,7 @@ def _world_state(env: VoyagerParallelEnv) -> Any:
 
 def _world_snapshot(env: VoyagerParallelEnv) -> dict[str, Any]:
     state = _world_state(env)
+    civilization = bool(state.structures)
     return {
         "camp": {
             "id": "camp",
@@ -667,22 +668,58 @@ def _world_snapshot(env: VoyagerParallelEnv) -> dict[str, Any]:
             }
             for y, x in np.argwhere(state.resource_quantities > 0)
         ],
-        "structures": [
+        "structures": (
+            [
+                {
+                    "id": structure.id,
+                    "type": structure.type,
+                    "x": structure.x,
+                    "y": structure.y,
+                    "progress": round(float(structure.progress), 6),
+                    "complete": structure.complete,
+                    "labor": structure.labor,
+                    "required_labor": structure.required_labor,
+                    "condition": structure.condition,
+                    "capacity": structure.capacity,
+                    "occupants": sorted(structure.occupants),
+                    "fuel": structure.fuel,
+                }
+                for structure in sorted(state.structures.values(), key=lambda value: value.id)
+            ]
+            if civilization
+            else [
+                {
+                    "id": "shelter",
+                    "type": "shelter",
+                    "x": state.camp.x,
+                    "y": state.camp.y,
+                    "progress": round(float(state.camp.shelter_progress), 6),
+                    "complete": state.camp.shelter_progress >= 1.0,
+                }
+            ]
+        ),
+        "creatures": [
             {
-                "id": "shelter",
-                "type": "shelter",
-                "x": state.camp.x,
-                "y": state.camp.y,
-                "progress": round(float(state.camp.shelter_progress), 6),
-                "complete": state.camp.shelter_progress >= 1.0,
+                "id": creature.id,
+                "type": creature.type,
+                "x": creature.x,
+                "y": creature.y,
+                "health": creature.health,
+                "max_health": creature.max_health,
+                "alive": creature.alive,
+                "target": creature.target,
+                "behavior": creature.behavior,
+                "spawn_tick": creature.spawn_tick,
             }
+            for creature in sorted(state.creatures.values(), key=lambda value: value.id)
         ],
         "agents": [
             _agent_snapshot(agent_id, agent, index)
             for index, (agent_id, agent) in enumerate(sorted(state.agents.items()))
         ],
         "achievements": sorted(state.achievements),
-        "extensions": {},
+        "time": env.world.civilization_time() if civilization else None,
+        "extensions": {"scenario_id": state.scenario_id},
     }
 
 
@@ -701,6 +738,9 @@ def _agent_snapshot(agent_id: str, agent: Any, index: int) -> dict[str, Any]:
         "energy": round(float(agent.energy), 4),
         "alive": bool(agent.alive),
         "inventory": dict(agent.inventory),
+        "tools": sorted(agent.tools),
+        "equipped_tool": agent.equipped_tool,
+        "sheltered": agent.sheltered,
         "extensions": {},
     }
 
@@ -721,6 +761,8 @@ def _state_delta(previous: dict[str, Any], current: dict[str, Any]) -> dict[str,
         "camp": current["camp"],
         "agents": current["agents"],
         "structures": current["structures"],
+        "creatures": current.get("creatures", []),
+        "time": current.get("time"),
         "resource_changes": resource_changes,
         "achievements": current["achievements"],
         "extensions": current.get("extensions", {}),
@@ -741,6 +783,8 @@ def apply_state_delta(state: dict[str, Any], delta: dict[str, Any]) -> dict[str,
         "camp": delta["camp"],
         "agents": delta["agents"],
         "structures": delta["structures"],
+        "creatures": delta.get("creatures", state.get("creatures", [])),
+        "time": delta.get("time", state.get("time")),
         "resources": [resources[key] for key in sorted(resources)],
         "achievements": delta["achievements"],
         "extensions": {**state.get("extensions", {}), **delta.get("extensions", {})},

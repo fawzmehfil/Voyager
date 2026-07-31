@@ -3,6 +3,9 @@ import type {
   ReplayAgent,
   ReplayArtifact,
   ReplayResource,
+  ReplayStructure,
+  ReplayCreature,
+  ReplayTime,
   ResourceType,
   TerrainType,
 } from "./types";
@@ -15,8 +18,8 @@ import type {
 } from "./platformTypes";
 
 const LEGACY_PATH = `${import.meta.env.BASE_URL}replays/stage6_vertical_slice_v1.json`;
-const knownTerrain = new Set(["water", "beach", "grass", "forest", "quarry"]);
-const knownResources = new Set(["none", "food", "wood", "stone"]);
+const knownTerrain = new Set(["water", "beach", "grass", "forest", "quarry", "rocky_highland", "cave"]);
+const knownResources = new Set(["none", "food", "wood", "stone", "raw_meat", "cooked_meat"]);
 const knownRoles = new Set(["forager", "woodcutter", "builder"]);
 
 interface V2Initial {
@@ -26,6 +29,9 @@ interface V2Initial {
   resources: Array<ReplayResource & { id: string }>;
   camp: ReplayArtifact["world"]["initial"]["camp"];
   agents: Array<Omit<ReplayAgent, "action" | "event">>;
+  structures?: ReplayStructure[];
+  creatures?: ReplayCreature[];
+  time?: ReplayTime | null;
 }
 
 interface TimelineRecord {
@@ -36,6 +42,9 @@ interface TimelineRecord {
     camp: ReplayArtifact["world"]["initial"]["camp"];
     agents: Array<Omit<ReplayAgent, "action" | "event">>;
     resource_changes: Array<ReplayResource & { id: string }>;
+    structures?: ReplayStructure[];
+    creatures?: ReplayCreature[];
+    time?: ReplayTime | null;
   };
   achievements: string[];
   weather: { storm_active: boolean };
@@ -112,7 +121,7 @@ export function validateManifestV2(value: unknown): ReplayManifestV2 {
     typeof manifest.world_steps !== "number" ||
     typeof manifest.tick_rate !== "number" ||
     !manifest.versions ||
-    !String(manifest.versions.replay ?? "").startsWith("stage6_replay_2.")
+    !/^stage[67]_replay_2\./.test(String(manifest.versions.replay ?? ""))
   ) {
     throw new Error("Unsupported or malformed Stage 6 replay manifest.");
   }
@@ -160,6 +169,9 @@ export function adaptV2ToRenderer(
       ),
       resource_changes: record.state_delta.resource_changes.map(normalizeResource),
       new_achievements: record.achievements,
+      structures: record.state_delta.structures,
+      creatures: record.state_delta.creatures,
+      time: record.state_delta.time,
     };
   });
   return {
@@ -191,6 +203,9 @@ export function adaptV2ToRenderer(
         resources: initialResources,
         camp: initial.camp,
         agents: initialAgents,
+        structures: initial.structures,
+        creatures: initial.creatures,
+        time: initial.time,
       },
     },
     frames,

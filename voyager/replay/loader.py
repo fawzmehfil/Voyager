@@ -211,6 +211,19 @@ class ReplayLoader:
                 state = self.state_at(tick)
                 if int(state["tick"]) != tick:
                     raise CorruptReplayError(f"Tick {tick} reconstructed as {state['tick']}.")
+                expected_hash = state.get("extensions", {}).get("state_hash")
+                if expected_hash:
+                    hashable = {
+                        key: value
+                        for key, value in state.items()
+                        if key not in {"tick", "weather", "terrain", "width", "height"}
+                    }
+                    hashable.pop("extensions", None)
+                    hashable["resources"] = sorted(
+                        hashable["resources"], key=lambda item: item["id"]
+                    )
+                    if sha256_value(hashable) != expected_hash:
+                        raise CorruptReplayError(f"Tick {tick} state hash does not reconstruct.")
         return {
             "replay_id": self.manifest.replay_id,
             "status": "valid",
