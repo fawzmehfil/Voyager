@@ -21,6 +21,12 @@ food-lot provenance and spoilage, ground piles, structure damage and repair, dow
 revival, and an append-only conservation/contribution ledger. Replay 2.2 records those
 facts without changing the Stage 7A replay or `VoyagerCivilization-v1` contract.
 
+The Stage 7C trainability probe is implemented but has not been run at full scale. It
+connects the shared feed-forward PPO trainer to the v2 observation and 270-action masked
+registry, evaluates five early capabilities against seed-matched legal-random play, and
+records component-level throughput. Procedural generation remains gated on the result of
+the two-million-transition experiment.
+
 ## Why This Exists
 
 Voyager is intended to compare learning methods for decentralized planning, resource
@@ -157,6 +163,22 @@ python examples/evaluate_baselines.py \
 When a PPO checkpoint is provided, evaluation always prints separate `ppo_deterministic` and `ppo_stochastic` rows. The environment masks impossible or currently useless actions during training and inference, including empty gathers, eating without food, invalid camp transactions, and shelter building without material.
 
 `--total-steps` counts agent transitions, not only world ticks. With `10` agents and `128` rollout steps, one PPO update collects up to `1280` training samples. Entropy decays linearly across those agent transitions from `--entropy-coef-start` to `--entropy-coef-end`.
+
+Run the Stage 7C handcrafted-island trainability gate when ready:
+
+```bash
+.venv-train/bin/python examples/run_stage7c_trainability_probe.py \
+  --total-agent-transitions 2000000 \
+  --seed 0 \
+  --output-dir results/stage7c/ppo_seed0
+```
+
+This is the full experiment, not a required test-suite step. It trains one shared
+`[128, 128]` feed-forward policy for all ten agents, evaluates checkpoints at the
+predeclared milestones, selects on ten development seeds, and evaluates the selected
+checkpoint against legal-random play on fifty separate held-out seeds. The output includes
+config, training history, checkpoints, episode-level capability outcomes, the paired
+bootstrap comparison, and a timing breakdown with a five-million-transition projection.
 
 ## Stage 5.6 Benchmark
 

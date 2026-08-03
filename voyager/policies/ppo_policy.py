@@ -12,7 +12,7 @@ from voyager.policies.base import Info, Observation, Policy, PolicyDecision
 from voyager.training.checkpoints import load_policy_checkpoint
 from voyager.training.masking import mask_numpy_logits, stack_action_masks
 from voyager.training.model import require_tensorflow
-from voyager.training.obs import flatten_observations
+from voyager.training.obs import COMPACT_OBSERVATION_ENCODER, flatten_observations
 
 
 @dataclass(slots=True)
@@ -28,6 +28,8 @@ class TensorFlowPPOPolicy(Policy):
     metadata: dict[str, object] = field(init=False, repr=False)
     tf: Any = field(init=False, repr=False)
     rng: np.random.Generator = field(init=False, repr=False)
+    action_count: int = field(init=False)
+    observation_encoder: str = field(init=False)
 
     def __post_init__(self) -> None:
         self.tf = require_tensorflow()
@@ -39,6 +41,13 @@ class TensorFlowPPOPolicy(Policy):
             self.mask_role_observation = not bool(
                 self.metadata.get("role_observation", True)
             )
+        raw_action_count = self.metadata.get("action_count")
+        if not isinstance(raw_action_count, int):
+            raise TypeError("Checkpoint metadata requires an integer action_count.")
+        self.action_count = raw_action_count
+        self.observation_encoder = str(
+            self.metadata.get("observation_encoder", COMPACT_OBSERVATION_ENCODER)
+        )
 
     def act(self, agent_id: str, observation: Observation, info: Info) -> int:
         return self.decide_many(
@@ -65,10 +74,14 @@ class TensorFlowPPOPolicy(Policy):
             agent_id: self._prepare_observation(observations[agent_id])
             for agent_id in agent_ids
         }
-        flat_obs = flatten_observations(prepared, agent_ids)
+        flat_obs = flatten_observations(
+            prepared,
+            agent_ids,
+            self.observation_encoder,
+        )
         logits, _value = self.model(flat_obs, training=False)
         logits_array = np.asarray(logits.numpy(), dtype=np.float64)
-        masks = stack_action_masks(infos, agent_ids)
+        masks = stack_action_masks(infos, agent_ids, self.action_count)
         decisions: dict[str, PolicyDecision] = {}
 
         for index, agent_id in enumerate(agent_ids):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import numpy as np
@@ -52,6 +53,24 @@ class VoyagerCivilizationV2Env(VoyagerCivilizationEnv):
             agent_id: observation_space for agent_id in self.possible_agents
         }
         self.action_spaces = {agent_id: action_space for agent_id in self.possible_agents}
+        self._cache_tick = -1
+        self._action_mask_cache: dict[str, np.ndarray] = {}
+        self._entity_slot_cache: dict[str, list[str]] = {}
+        self._conservation_cache: dict[str, int] | None = None
+        self.performance_seconds = {
+            "observation_generation": 0.0,
+            "action_mask_generation": 0.0,
+            "entity_slot_generation": 0.0,
+            "ledger_reconciliation": 0.0,
+        }
+
+    def reset(
+        self,
+        seed: int | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> tuple[dict[str, dict[str, np.ndarray]], dict[str, dict[str, Any]]]:
+        self._clear_step_caches()
+        return super().reset(seed=seed, options=options)
 
     def step(  # type: ignore[override]
         self,
@@ -92,7 +111,46 @@ class VoyagerCivilizationV2Env(VoyagerCivilizationEnv):
         return VoyagerParallelEnv.step(self, parsed)  # type: ignore[arg-type,return-value]
 
     def action_mask(self, agent_id: str) -> np.ndarray:
-        return self.world.v2_action_mask(agent_id)
+        self._refresh_step_caches()
+        if agent_id not in self._action_mask_cache:
+            started = time.perf_counter()
+            self._action_mask_cache[agent_id] = self.world.v2_action_mask(agent_id)
+            self.performance_seconds["action_mask_generation"] += (
+                time.perf_counter() - started
+            )
+        return self._action_mask_cache[agent_id].copy()
+
+    def _entity_slots(self, agent_id: str) -> list[str]:
+        self._refresh_step_caches()
+        if agent_id not in self._entity_slot_cache:
+            started = time.perf_counter()
+            self._entity_slot_cache[agent_id] = self.world.v2_entity_slots(agent_id)
+            self.performance_seconds["entity_slot_generation"] += (
+                time.perf_counter() - started
+            )
+        return list(self._entity_slot_cache[agent_id])
+
+    def _conservation(self) -> dict[str, int]:
+        self._refresh_step_caches()
+        if self._conservation_cache is None:
+            started = time.perf_counter()
+            self._conservation_cache = self.world.reconcile_v2_ledger()
+            self.performance_seconds["ledger_reconciliation"] += (
+                time.perf_counter() - started
+            )
+        return dict(self._conservation_cache)
+
+    def _refresh_step_caches(self) -> None:
+        state = self.world.state
+        tick = -1 if state is None else state.step_count
+        if tick != self._cache_tick:
+            self._clear_step_caches(tick)
+
+    def _clear_step_caches(self, tick: int = -1) -> None:
+        self._cache_tick = tick
+        self._action_mask_cache.clear()
+        self._entity_slot_cache.clear()
+        self._conservation_cache = None
 
     def _build_observation_space(self) -> spaces.Dict:
         return spaces.Dict(
@@ -122,6 +180,7 @@ class VoyagerCivilizationV2Env(VoyagerCivilizationEnv):
         )
 
     def _observation(self, agent_id: str) -> dict[str, np.ndarray]:
+        started = time.perf_counter()
         base = VoyagerCivilizationEnv._observation(self, agent_id)
         state = self.world.state
         if state is None:
@@ -169,7 +228,7 @@ class VoyagerCivilizationV2Env(VoyagerCivilizationEnv):
             camp[19] = 1.0
 
         slots = np.zeros((V2_ENTITY_SLOT_COUNT, 12), dtype=np.float32)
-        for index, entity_ref in enumerate(self.world.v2_entity_slots(agent_id)):
+        for index, entity_ref in enumerate(self._entity_slots(agent_id)):
             kind, entity_id = entity_ref.split(":", maxsplit=1)
             x, y, condition, active, downed, dead = self._entity_values(kind, entity_id)
             hostility = float(kind == "creature" and entity_id.startswith("stalker"))
@@ -193,7 +252,7 @@ class VoyagerCivilizationV2Env(VoyagerCivilizationEnv):
                 dtype=np.float32,
             )
 
-        return {
+        observation = {
             "local_tiles": local_tiles,
             "self_state": np.array(
                 [
@@ -232,6 +291,10 @@ class VoyagerCivilizationV2Env(VoyagerCivilizationEnv):
             "entity_slots": slots,
             "action_mask": self.action_mask(agent_id),
         }
+        self.performance_seconds["observation_generation"] += (
+            time.perf_counter() - started
+        )
+        return observation
 
     def _entity_values(
         self, kind: str, entity_id: str
@@ -279,12 +342,12 @@ class VoyagerCivilizationV2Env(VoyagerCivilizationEnv):
         info.update(
             {
                 "interface_version": 2,
-                "entity_slots": self.world.v2_entity_slots(agent_id),
+                "entity_slots": self._entity_slots(agent_id),
                 "life_state": agent.life_state,
                 "downed_ticks": agent.downed_ticks,
                 "tool_charges": dict(agent.tool_charges),
                 "ledger_entries": len(state.ledger),
-                "conservation": self.world.reconcile_v2_ledger(),
+                "conservation": self._conservation(),
             }
         )
         info.pop("target_slots", None)
@@ -340,6 +403,10 @@ class CivilizationV2FlattenedActionWrapper(
 
     def state(self) -> dict[str, object]:
         return self.env.global_state()
+
+    @property
+    def performance_seconds(self) -> dict[str, float]:
+        return self.env.performance_seconds
 
     def close(self) -> None:
         self.env.close()

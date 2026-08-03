@@ -27,13 +27,14 @@ Current implementation status as of 2026-08-03:
 | Phase | Status | Result |
 |---|---|---|
 | 7A | Implemented and committed | Handcrafted 48x48 island, ten agents, two days, workbench, campfire, shelter, hunting, cooking, stalkers, Replay 2.1 |
-| 7B | Implemented in the working tree; release closeout pending | Deterministic intent resolution, owned tools, transfers, food lots, spoilage, piles, damage, repair, downing, revival, ledger, Replay 2.2 |
-| 7C-7G | Planned | Trainability gate, procedural islands, rescue economy, MARL baselines, frozen benchmark, final viewer |
+| 7B | Implemented and committed | Deterministic intent resolution, owned tools, transfers, food lots, spoilage, piles, damage, repair, downing, revival, ledger, Replay 2.2 |
+| 7C trainability slice | Implemented; full run pending | V2 PPO adapter, shared probe reward, outcome evaluator, checkpoint selection, and component profiler |
+| 7C procedural substrate-7G | Planned | Procedural islands, rescue economy, MARL baselines, frozen benchmark, final viewer |
 
-Stage 7B currently passes the complete Python suite with 100 passed and 5 skipped tests,
-including nine focused deterministic-core tests. Before its release commit, its canonical
-replay must visibly complete the planned revival and the remaining lint, typing, frontend,
-build, replay, and browser checks must pass.
+Stage 7B is released with a canonical Replay 2.2 demonstration that completes revival
+through public actions. Stage 7C now provides the executable trainability gate, but no
+two-million-transition result is claimed until that command is run and its held-out
+outcomes are inspected.
 
 ## Brutal Usefulness Verdict
 
@@ -674,6 +675,36 @@ Exit criterion:
 - PPO learns early progression above random.
 - A large seed sweep is deterministic, reachable, and valid.
 - A five-million-transition run is projected to complete overnight on the M2.
+
+The trainability slice is implemented by
+`examples/run_stage7c_trainability_probe.py`. It leaves the full experiment under explicit
+user control:
+
+```bash
+.venv-train/bin/python examples/run_stage7c_trainability_probe.py \
+  --total-agent-transitions 2000000 \
+  --seed 0 \
+  --output-dir results/stage7c/ppo_seed0
+```
+
+The runner uses one shared `[128, 128]` feed-forward policy, the v2 flattened action mask,
+and the versioned `civilization_trainability_probe_v1` shared reward. At 250K, 500K, 1M,
+1.5M, and 2M agent transitions it evaluates deterministic inference on ten development
+seeds. It selects the best development checkpoint and compares it with legal-random play
+on fifty separate held-out seeds.
+
+The gate metrics are independent of training reward: gathering both wood and stone,
+depositing both, completing the workbench, crafting any tool, and retaining at least six
+active agents at tick 300. Passing requires a composite advantage of at least 0.15 over
+seed-matched random with a paired 95 percent bootstrap interval excluding zero, plus the
+predeclared per-capability thresholds. Config, history, checkpoints, detailed episodes,
+comparisons, and timing artifacts are written beneath the selected output directory.
+
+The implementation profiles actor-observation encoding, mask stacking, actor/value
+inference, environment stepping, PPO updates, v2 observation construction, v2 legal-mask
+generation, entity-slot generation, and conservation-ledger reconciliation. A short smoke
+run validates the workflow but is not evidence of learnability. Procedural generation must
+still wait for the full trainability result.
 
 ### Stage 7D: Final Economy And Rescue
 

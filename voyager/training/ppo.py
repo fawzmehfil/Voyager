@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import platform
 import subprocess
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from importlib.metadata import version
@@ -12,22 +13,17 @@ from typing import Any
 
 import numpy as np
 
-from voyager.envs import VoyagerParallelEnv
-from voyager.sim.constants import ACTION_COUNT
 from voyager.sim.rewards import DENSE_REWARD_COMPONENTS, REWARD_MODES, RewardMode
 from voyager.training.advantages import compute_gae
 from voyager.training.checkpoints import save_policy_checkpoint
+from voyager.training.environments import (
+    COMPACT_TRAINING_ENVIRONMENT,
+    ENVIRONMENT_REWARD_CONTRACT,
+    make_training_environment,
+)
 from voyager.training.masking import stack_action_masks
 from voyager.training.model import build_actor_critic, require_tensorflow
 from voyager.training.obs import flat_observation_size, flatten_observations
-from voyager.versions import (
-    ACHIEVEMENT_VERSION,
-    ACTION_VERSION,
-    DENSE_REWARD_VERSION,
-    ENVIRONMENT_VERSION,
-    OBSERVATION_VERSION,
-    SCENARIO_VERSION,
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +31,8 @@ class PPOConfig:
     """Configuration for shared-policy Voyager PPO."""
 
     total_steps: int = 50_000
+    environment_id: str = COMPACT_TRAINING_ENVIRONMENT
+    reward_contract: str = ENVIRONMENT_REWARD_CONTRACT
     rollout_steps: int = 128
     num_agents: int = 10
     map_size: int = 32
@@ -132,18 +130,23 @@ class PPOUpdateStats:
     entropy: float
     entropy_coef: float
     total_loss: float
+    rollout_seconds: float
+    update_seconds: float
+    agent_steps_per_second: float
     checkpoint_path: str | None
 
 
 class PPOTrainer:
-    """Train a shared actor-critic policy on VoyagerParallelEnv."""
+    """Train one shared actor-critic policy on a supported Voyager environment."""
 
     def __init__(self, config: PPOConfig) -> None:
         config.validate()
         self.config = config
         self.tf = require_tensorflow()
         self.rng = np.random.default_rng(config.seed)
-        self.env = VoyagerParallelEnv(
+        training_environment = make_training_environment(
+            environment_id=config.environment_id,
+            reward_contract=config.reward_contract,
             num_agents=config.num_agents,
             map_size=config.map_size,
             max_steps=config.max_steps,
@@ -151,19 +154,41 @@ class PPOTrainer:
             disabled_reward_components=config.disabled_reward_components,
             mask_role_observation=config.mask_role_observation,
         )
+        self.env = training_environment.env
+        self.observation_encoder = training_environment.observation_encoder
+        self.resolved_num_agents = training_environment.num_agents
+        self.resolved_map_size = training_environment.map_size
+        self.resolved_max_steps = training_environment.max_steps
+        self.contract_versions = training_environment.versions
         self.observations, self.infos = self.env.reset(seed=config.seed)
         self.reset_count = 1
         first_agent = self.env.possible_agents[0]
-        self.input_dim = flat_observation_size(self.env.observation_space(first_agent))
+        action_space = self.env.action_space(first_agent)
+        if not hasattr(action_space, "n"):
+            raise ValueError("PPO requires a one-dimensional discrete action space.")
+        self.action_count = int(action_space.n)
+        self.input_dim = flat_observation_size(
+            self.env.observation_space(first_agent),
+            self.observation_encoder,
+        )
         self.model = build_actor_critic(
             input_dim=self.input_dim,
-            action_count=ACTION_COUNT,
+            action_count=self.action_count,
             hidden_sizes=config.hidden_sizes,
             seed=config.seed,
         )
         self.optimizer = self.tf.keras.optimizers.Adam(learning_rate=config.learning_rate)
         self.agent_steps = 0
         self.world_steps = 0
+        self.timing_seconds: dict[str, float] = {
+            "observation_encoding": 0.0,
+            "action_masks": 0.0,
+            "actor_inference": 0.0,
+            "environment_step": 0.0,
+            "next_value_inference": 0.0,
+            "batch_and_gae": 0.0,
+            "learner_update": 0.0,
+        }
 
     def train(
         self,
@@ -173,15 +198,23 @@ class PPOTrainer:
 
         stats: list[PPOUpdateStats] = []
         update = 0
+        training_started = time.perf_counter()
         while self.agent_steps < self.config.total_steps:
             update += 1
-            batch = self.collect_rollout()
+            rollout_started = time.perf_counter()
+            batch = self.collect_rollout(
+                max_agent_steps=self.config.total_steps - self.agent_steps
+            )
+            rollout_seconds = time.perf_counter() - rollout_started
             entropy_coef = (
                 self.config.entropy_coef_end
                 if self.agent_steps + int(batch.actions.shape[0]) >= self.config.total_steps
                 else self.config.entropy_coefficient(self.agent_steps)
             )
+            update_started = time.perf_counter()
             losses = self.update_policy(batch, entropy_coef=entropy_coef)
+            update_seconds = time.perf_counter() - update_started
+            self.timing_seconds["learner_update"] += update_seconds
             self.agent_steps += int(batch.actions.shape[0])
             checkpoint_path = self._maybe_save_checkpoint(update)
             update_stats = PPOUpdateStats(
@@ -194,6 +227,10 @@ class PPOTrainer:
                 entropy=losses["entropy"],
                 entropy_coef=entropy_coef,
                 total_loss=losses["total_loss"],
+                rollout_seconds=rollout_seconds,
+                update_seconds=update_seconds,
+                agent_steps_per_second=self.agent_steps
+                / max(time.perf_counter() - training_started, 1e-9),
                 checkpoint_path=checkpoint_path,
             )
             stats.append(update_stats)
@@ -202,8 +239,11 @@ class PPOTrainer:
         self._save_checkpoint(update)
         return stats
 
-    def collect_rollout(self) -> RolloutBatch:
-        """Collect one fixed-length rollout across all live agents."""
+    def collect_rollout(self, max_agent_steps: int | None = None) -> RolloutBatch:
+        """Collect one rollout, shortening the final batch to respect a step budget."""
+
+        if max_agent_steps is not None and max_agent_steps <= 0:
+            raise ValueError("max_agent_steps must be positive when provided.")
 
         obs_rows: list[np.ndarray] = []
         action_mask_rows: list[np.ndarray] = []
@@ -220,23 +260,47 @@ class PPOTrainer:
                 self._reset_env()
 
             agent_ids = tuple(self.env.agents)
-            flat_obs = flatten_observations(self.observations, agent_ids)
-            action_masks = stack_action_masks(self.infos, agent_ids)
+            if (
+                max_agent_steps is not None
+                and obs_rows
+                and len(obs_rows) + len(agent_ids) > max_agent_steps
+            ):
+                break
+            started = time.perf_counter()
+            flat_obs = flatten_observations(
+                self.observations,
+                agent_ids,
+                self.observation_encoder,
+            )
+            self.timing_seconds["observation_encoding"] += time.perf_counter() - started
+            started = time.perf_counter()
+            action_masks = stack_action_masks(
+                self.infos,
+                agent_ids,
+                self.action_count,
+            )
+            self.timing_seconds["action_masks"] += time.perf_counter() - started
             if not self.config.use_action_mask:
                 action_masks = np.ones_like(action_masks, dtype=np.bool_)
+            started = time.perf_counter()
             logits, values = self.model(flat_obs, training=False)
             masked_logits = self._mask_logits(logits, action_masks)
             actions = self._sample_actions(masked_logits)
             log_probs = self._selected_log_probs(masked_logits, actions).numpy()
             values_np = np.squeeze(values.numpy(), axis=1).astype(np.float32)
+            self.timing_seconds["actor_inference"] += time.perf_counter() - started
 
             action_map = {
                 agent_id: int(actions[index])
                 for index, agent_id in enumerate(agent_ids)
             }
+            started = time.perf_counter()
             next_observations, rewards, terminations, truncations, step_infos = self.env.step(action_map)
+            self.timing_seconds["environment_step"] += time.perf_counter() - started
             self.world_steps += 1
+            started = time.perf_counter()
             next_values_by_agent = self._next_values(next_observations)
+            self.timing_seconds["next_value_inference"] += time.perf_counter() - started
 
             for index, agent_id in enumerate(agent_ids):
                 done = bool(terminations[agent_id] or truncations[agent_id])
@@ -253,6 +317,7 @@ class PPOTrainer:
             self.observations = next_observations
             self.infos.update(step_infos)
 
+        started = time.perf_counter()
         observations = np.asarray(obs_rows, dtype=np.float32)
         action_masks_array = np.asarray(action_mask_rows, dtype=np.bool_)
         actions_array = np.asarray(actions_rows, dtype=np.int32)
@@ -269,6 +334,7 @@ class PPOTrainer:
             agent_ids=agent_rows,
         )
         advantages = _normalize_advantages(advantages)
+        self.timing_seconds["batch_and_gae"] += time.perf_counter() - started
 
         return RolloutBatch(
             observations=observations,
@@ -386,7 +452,7 @@ class PPOTrainer:
         return self.tf.where(masks, logits, invalid_logits)
 
     def _selected_log_probs(self, logits: Any, actions: Any) -> Any:
-        action_mask = self.tf.one_hot(actions, depth=ACTION_COUNT)
+        action_mask = self.tf.one_hot(actions, depth=self.action_count)
         return self.tf.reduce_sum(action_mask * self.tf.nn.log_softmax(logits), axis=1)
 
     def _entropy(self, logits: Any) -> Any:
@@ -398,7 +464,11 @@ class PPOTrainer:
         if not observations:
             return {}
         agent_ids = tuple(observations)
-        flat_obs = flatten_observations(observations, agent_ids)
+        flat_obs = flatten_observations(
+            observations,
+            agent_ids,
+            self.observation_encoder,
+        )
         _logits, values = self.model(flat_obs, training=False)
         values_np = np.squeeze(values.numpy(), axis=1)
         return {
@@ -420,21 +490,71 @@ class PPOTrainer:
             return None
         return self._save_checkpoint(update)
 
+    def save_named_checkpoint(self, name: str, update: int) -> str:
+        """Save the current policy under a stable experiment-specific name."""
+
+        if self.config.checkpoint_dir is None:
+            raise ValueError("Named checkpoints require checkpoint_dir to be configured.")
+        path = Path(self.config.checkpoint_dir) / name
+        return str(
+            save_policy_checkpoint(
+                self.model,
+                path,
+                self._checkpoint_metadata(update),
+            )
+        )
+
+    def timing_report(self) -> dict[str, object]:
+        """Return measured component timings and practical throughput projections."""
+
+        measured_seconds = float(sum(self.timing_seconds.values()))
+        agent_steps_per_second = self.agent_steps / max(measured_seconds, 1e-9)
+        world_steps_per_second = self.world_steps / max(measured_seconds, 1e-9)
+        environment_detail = getattr(self.env, "performance_seconds", {})
+        if not isinstance(environment_detail, dict):
+            environment_detail = {}
+        return {
+            "agent_steps": self.agent_steps,
+            "world_steps": self.world_steps,
+            "measured_seconds": measured_seconds,
+            "agent_steps_per_second": agent_steps_per_second,
+            "world_steps_per_second": world_steps_per_second,
+            "projected_five_million_hours": 5_000_000
+            / max(agent_steps_per_second, 1e-9)
+            / 3_600,
+            "components_seconds": dict(self.timing_seconds),
+            "components_fraction": {
+                name: seconds / max(measured_seconds, 1e-9)
+                for name, seconds in self.timing_seconds.items()
+            },
+            "environment_detail_seconds": dict(environment_detail),
+        }
+
     def _save_checkpoint(self, update: int) -> str | None:
         if self.config.checkpoint_dir is None:
             return None
         root = Path(self.config.checkpoint_dir)
-        metadata = {
-            "stage": 5,
+        metadata = self._checkpoint_metadata(update)
+        latest = save_policy_checkpoint(self.model, root / "latest", metadata)
+        if self.config.checkpoint_every > 0 and update % self.config.checkpoint_every == 0:
+            save_policy_checkpoint(self.model, root / f"update_{update:05d}", metadata)
+        return str(latest)
+
+    def _checkpoint_metadata(self, update: int) -> dict[str, object]:
+        return {
+            "stage": 7 if self.config.environment_id != COMPACT_TRAINING_ENVIRONMENT else 5,
             "algorithm": "shared_policy_ppo",
             "update": update,
             "agent_steps": self.agent_steps,
             "input_dim": self.input_dim,
-            "action_count": ACTION_COUNT,
+            "action_count": self.action_count,
+            "observation_encoder": self.observation_encoder,
+            "environment_id": self.config.environment_id,
+            "reward_contract": self.config.reward_contract,
             "hidden_sizes": list(self.config.hidden_sizes),
-            "num_agents": self.config.num_agents,
-            "map_size": self.config.map_size,
-            "max_steps": self.config.max_steps,
+            "num_agents": self.resolved_num_agents,
+            "map_size": self.resolved_map_size,
+            "max_steps": self.resolved_max_steps,
             "rollout_steps": self.config.rollout_steps,
             "world_steps": self.world_steps,
             "environment_resets": self.reset_count,
@@ -453,13 +573,8 @@ class PPOTrainer:
             "reward_mode": self.config.reward_mode,
             "disabled_reward_components": list(self.config.disabled_reward_components),
             "role_observation": not self.config.mask_role_observation,
-            "environment_version": ENVIRONMENT_VERSION,
-            "reward_version": DENSE_REWARD_VERSION,
-            "observation_version": OBSERVATION_VERSION,
-            "action_version": ACTION_VERSION,
-            "achievement_version": ACHIEVEMENT_VERSION,
-            "scenario_version": SCENARIO_VERSION,
-            "training_revision": "5.6",
+            **self.contract_versions,
+            "timing_seconds": dict(self.timing_seconds),
             "python_version": platform.python_version(),
             "tensorflow_version": self.tf.__version__,
             "numpy_version": version("numpy"),
@@ -467,10 +582,6 @@ class PPOTrainer:
             "pettingzoo_version": version("pettingzoo"),
             "git_revision": _git_revision(),
         }
-        latest = save_policy_checkpoint(self.model, root / "latest", metadata)
-        if self.config.checkpoint_every > 0 and update % self.config.checkpoint_every == 0:
-            save_policy_checkpoint(self.model, root / f"update_{update:05d}", metadata)
-        return str(latest)
 
 
 def _normalize_advantages(advantages: np.ndarray) -> np.ndarray:
