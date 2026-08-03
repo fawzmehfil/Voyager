@@ -6,6 +6,20 @@ import numpy as np
 
 
 @dataclass(slots=True)
+class FoodLot:
+    """One deterministic food lot with auditable provenance and expiry."""
+
+    id: str
+    kind: str
+    quantity: int
+    origin_type: str
+    origin_id: str
+    created_tick: int
+    expires_tick: int | None
+    preparation: str
+
+
+@dataclass(slots=True)
 class AgentState:
     """Mutable survival state for the Stage 1 agent."""
 
@@ -21,6 +35,28 @@ class AgentState:
     tools: set[str] = field(default_factory=set)
     equipped_tool: str | None = None
     sheltered: bool = False
+    life_state: str = "active"
+    downed_ticks: int = 0
+    downed_count: int = 0
+    revival_labor: int = 0
+    revival_food_lot_id: str | None = None
+    food_lots: list[FoodLot] = field(default_factory=list)
+    tool_charges: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class GroundPileState:
+    """A world item pile created by a recorded simulation event."""
+
+    id: str
+    x: int
+    y: int
+    item: str
+    quantity: int
+    origin_type: str
+    origin_id: str
+    created_tick: int
+    expires_tick: int | None = None
 
 
 @dataclass(slots=True)
@@ -39,6 +75,9 @@ class StructureState:
     capacity: int = 0
     occupants: set[str] = field(default_factory=set)
     fuel: int = 0
+    occupancy_order: list[str] = field(default_factory=list)
+    repair_labor: int = 0
+    repair_material_reserved: bool = False
 
     @property
     def progress(self) -> float:
@@ -89,6 +128,8 @@ class CampState:
     food_origins: list[str] = field(default_factory=list)
     shelter_progress: float = 0.0
     shelter_capacity: int = 0
+    food_lots: list[FoodLot] = field(default_factory=list)
+    tool_stockpile: dict[str, list[int]] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -136,3 +177,6 @@ class MultiAgentWorldState:
     prevented_damage: int = 0
     full_fire_night_ticks: int = 0
     full_shelter_night_ticks: int = 0
+    ground_piles: dict[str, GroundPileState] = field(default_factory=dict)
+    ledger: list[dict[str, object]] = field(default_factory=list)
+    spoiled_resources: dict[str, int] = field(default_factory=dict)

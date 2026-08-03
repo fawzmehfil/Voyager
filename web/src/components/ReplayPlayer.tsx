@@ -550,6 +550,13 @@ function AgentsPanel({ agents, selectedAgent, selectAgent, tick }: InspectorProp
             PACK · F{selectedAgent.inventory.food} W{selectedAgent.inventory.wood} S
             {selectedAgent.inventory.stone}
           </p>
+          <p>
+            TOOLS · {selectedAgent.tools?.join(", ") || "none"}
+            {selectedAgent.equipped_tool ? ` · EQUIPPED ${selectedAgent.equipped_tool}` : ""}
+          </p>
+          {selectedAgent.life_state === "downed" && (
+            <p>DOWNED · {selectedAgent.downed_ticks ?? 0} TICKS TO RESCUE</p>
+          )}
         </div>
       )}
     </div>

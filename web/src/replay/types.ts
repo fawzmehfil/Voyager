@@ -20,6 +20,17 @@ export interface ReplayStructure {
   fuel?: number;
   capacity?: number;
   occupants?: string[];
+  condition?: number;
+  repair_labor?: number;
+}
+
+export interface ReplayGroundPile {
+  id: string;
+  x: number;
+  y: number;
+  item: ResourceType;
+  quantity: number;
+  expires_tick?: number | null;
 }
 
 export interface ReplayCreature {
@@ -45,6 +56,7 @@ export interface ReplayCamp {
   y: number;
   stockpile: Stockpile;
   shelter_progress: number;
+  tool_stockpile?: Record<string, number[]>;
 }
 
 export interface ReplayResource {
@@ -76,6 +88,11 @@ export interface ReplayAgent {
   inventory: Stockpile;
   action: string;
   event: string;
+  life_state?: "active" | "downed" | "dead";
+  downed_ticks?: number;
+  tools?: string[];
+  equipped_tool?: string | null;
+  tool_charges?: Record<string, number>;
 }
 
 export interface ReplayFrame {
@@ -87,6 +104,7 @@ export interface ReplayFrame {
   new_achievements: string[];
   structures?: ReplayStructure[];
   creatures?: ReplayCreature[];
+  ground_piles?: ReplayGroundPile[];
   time?: ReplayTime | null;
 }
 
@@ -117,6 +135,7 @@ export interface ReplayArtifact {
       agents: ReplayAgent[];
       structures?: ReplayStructure[];
       creatures?: ReplayCreature[];
+      ground_piles?: ReplayGroundPile[];
       time?: ReplayTime | null;
     };
   };

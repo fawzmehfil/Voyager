@@ -36,6 +36,7 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
         disabled_reward_components: tuple[str, ...] = (),
         mask_role_observation: bool = False,
         scenario_id: str = COMPACT_SCENARIO_ID,
+        civilization_version: int = 1,
         render_mode: str | None = None,
     ) -> None:
         if map_size < 9:
@@ -72,6 +73,7 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
             food_regen_interval=food_regen_interval,
             food_spawn_rate=food_spawn_rate,
             scenario_id=scenario_id,
+            civilization_version=civilization_version,
         )
         self.possible_agents = list(self.world.possible_agents)
         self.agents: list[str] = []

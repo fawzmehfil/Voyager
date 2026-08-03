@@ -12,6 +12,7 @@ import type {
   ReplayFrame,
   ReplayStructure,
   ReplayCreature,
+  ReplayGroundPile,
   ReplayResource,
   ReplayStatus,
   TerrainType,
@@ -88,6 +89,7 @@ export class ReplayScene extends Phaser.Scene {
   private nightShade?: Phaser.GameObjects.Rectangle;
   private structureVisuals = new Map<string, Phaser.GameObjects.Container>();
   private creatureVisuals = new Map<string, Phaser.GameObjects.Container>();
+  private groundPileVisuals = new Map<string, Phaser.GameObjects.Container>();
   private toast?: Phaser.GameObjects.Text;
   private finale?: Phaser.GameObjects.Container;
   private waterFrame = 0;
@@ -119,6 +121,7 @@ export class ReplayScene extends Phaser.Scene {
     this.createCamp();
     this.updateStructures(this.replay.world.initial.structures ?? []);
     this.updateCreatures(this.replay.world.initial.creatures ?? []);
+    this.updateGroundPiles(this.replay.world.initial.ground_piles ?? []);
     this.createAgents(this.replay.world.initial.agents);
     this.createWeather();
     this.createToast();
@@ -194,6 +197,7 @@ export class ReplayScene extends Phaser.Scene {
     this.nightShade = undefined;
     this.structureVisuals.clear();
     this.creatureVisuals.clear();
+    this.groundPileVisuals.clear();
     this.toast = undefined;
     this.finale = undefined;
     this.scene.restart();
@@ -454,6 +458,7 @@ export class ReplayScene extends Phaser.Scene {
     frame.agents.forEach((agent) => this.updateAgent(agent, frame.step));
     this.updateStructures(frame.structures ?? []);
     this.updateCreatures(frame.creatures ?? []);
+    this.updateGroundPiles(frame.ground_piles ?? []);
     this.setNight(frame.time?.phase === "night");
     if (!this.isSeeking) {
       frame.new_achievements.forEach((achievement) =>
@@ -485,6 +490,8 @@ export class ReplayScene extends Phaser.Scene {
         this.structureVisuals.set(structure.id, visual);
       }
       visual.setAlpha(structure.complete ? 1 : Math.max(0.3, structure.progress));
+      if ((structure.condition ?? 100) === 0) visual.setAlpha(0.25);
+      else if ((structure.condition ?? 100) < 50) visual.setAlpha(0.55);
     });
   }
 
@@ -509,6 +516,30 @@ export class ReplayScene extends Phaser.Scene {
       visual.setAlpha(Math.max(0.35, creature.health / Math.max(1, creature.max_health)));
     });
     this.creatureVisuals.forEach((visual, id) => {
+      if (!visible.has(id)) visual.setVisible(false);
+    });
+  }
+
+  private updateGroundPiles(piles: ReplayGroundPile[]) {
+    const visible = new Set<string>();
+    piles.forEach((pile) => {
+      visible.add(pile.id);
+      let visual = this.groundPileVisuals.get(pile.id);
+      if (!visual) {
+        const marker = this.add.rectangle(0, 0, 22, 14, 0xb74a3f, 0.95)
+          .setStrokeStyle(2, 0x5b211d);
+        const label = this.add.text(0, -16, `MEAT ×${pile.quantity}`, {
+          fontFamily: '"IBM Plex Mono"', fontSize: "9px", color: "#fff3d2",
+          backgroundColor: "#15231de6", padding: { x: 3, y: 2 },
+        }).setOrigin(0.5);
+        visual = this.add.container(this.tileX(pile.x), this.tileY(pile.y), [marker, label]);
+        this.groundPileVisuals.set(pile.id, visual);
+      }
+      visual.setPosition(this.tileX(pile.x), this.tileY(pile.y));
+      visual.setDepth(2450 + this.tileY(pile.y));
+      visual.setVisible(pile.quantity > 0);
+    });
+    this.groundPileVisuals.forEach((visual, id) => {
       if (!visible.has(id)) visual.setVisible(false);
     });
   }
@@ -567,7 +598,10 @@ export class ReplayScene extends Phaser.Scene {
 
     visual.lastX = agent.x;
     visual.lastY = agent.y;
-    visual.container.setAlpha(agent.alive ? 1 : 0.35);
+    const downed = agent.life_state === "downed";
+    visual.body.setAngle(downed ? 90 : 0);
+    visual.body.setTint(downed ? 0xd96b62 : 0xffffff);
+    visual.container.setAlpha(downed ? 0.65 : agent.alive ? 1 : 0.35);
   }
 
   private updateCamp(camp: ReplayCamp) {

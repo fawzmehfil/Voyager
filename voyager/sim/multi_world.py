@@ -1,5 +1,6 @@
 """Multi-agent island world mechanics for Voyager."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 
 import numpy as np
@@ -17,6 +18,7 @@ from voyager.sim.registries import (
     CivilizationArgument,
     CivilizationVerb,
 )
+from voyager.sim.registries_v2 import CivilizationV2Action
 from voyager.sim.scenarios import (
     CIVILIZATION_CAMP,
     CIVILIZATION_CAMPFIRE,
@@ -32,6 +34,7 @@ from voyager.sim.state import (
     AgentState,
     CampState,
     CreatureState,
+    FoodLot,
     MultiAgentWorldState,
     StructureState,
 )
@@ -73,6 +76,7 @@ class MultiAgentWorld:
         food_regen_interval: int = 50,
         food_spawn_rate: float = 0.04,
         scenario_id: str = COMPACT_SCENARIO_ID,
+        civilization_version: int = 1,
     ) -> None:
         if num_agents < 1:
             raise ValueError("num_agents must be at least 1.")
@@ -88,6 +92,7 @@ class MultiAgentWorld:
         self.food_spawn_rate = food_spawn_rate
         self.scenario_id = scenario_id
         self.civilization = scenario_id == CIVILIZATION_SCENARIO_ID
+        self.civilization_version = civilization_version
         self.possible_agents = [f"agent_{index}" for index in range(num_agents)]
         self.state: MultiAgentWorldState | None = None
         self.rng = np.random.default_rng()
@@ -151,13 +156,20 @@ class MultiAgentWorld:
             structures=structures,
             creatures=creatures,
         )
+        if self.civilization and self.civilization_version >= 2:
+            self._initialize_v2_state()
         return self.state
 
     def step(
         self,
-        actions: dict[str, int | CivilizationAction],
+        actions: Mapping[str, int | CivilizationAction | CivilizationV2Action],
     ) -> dict[str, AgentStepResult]:
         """Apply one stable-order simultaneous step for all currently living agents."""
+
+        if self.civilization and self.civilization_version >= 2:
+            from voyager.sim.core_v2 import step_civilization_v2
+
+            return step_civilization_v2(self, actions)
 
         state = self._require_state()
         previous_deaths = state.deaths
@@ -218,6 +230,8 @@ class MultiAgentWorld:
                 for name, value in component_updates.items():
                     reward_components[name] = reward_components.get(name, 0.0) + value
             else:
+                if isinstance(raw_action, CivilizationV2Action):
+                    raw_action = Action.NOOP
                 action = self._parse_action(raw_action)
                 if action in {
                     Action.MOVE_UP,
@@ -294,6 +308,26 @@ class MultiAgentWorld:
                     new_achievements=new_achievements,
                 )
         return results
+
+    def _initialize_v2_state(self) -> None:
+        from voyager.sim.core_v2 import initialize_v2_state
+
+        initialize_v2_state(self)
+
+    def v2_entity_slots(self, agent_id: str) -> list[str]:
+        from voyager.sim.core_v2 import entity_slots
+
+        return entity_slots(self, agent_id)
+
+    def v2_action_mask(self, agent_id: str) -> np.ndarray:
+        from voyager.sim.core_v2 import action_mask
+
+        return action_mask(self, agent_id)
+
+    def reconcile_v2_ledger(self) -> dict[str, int]:
+        from voyager.sim.core_v2 import reconcile_ledger
+
+        return reconcile_ledger(self)
 
     def alive_agents(self) -> list[str]:
         """Return live agents in stable possible-agent order."""
@@ -543,7 +577,7 @@ class MultiAgentWorld:
         """Return versioned privileged state for scripts, recording, and debugging."""
 
         state = self._require_state()
-        return {
+        payload: dict[str, object] = {
             "version": "civilization_global_state_v1",
             "scenario_id": state.scenario_id,
             "tick": state.step_count,
@@ -578,6 +612,77 @@ class MultiAgentWorld:
             },
             "events": list(state.events),
             "rng_state": self.rng.bit_generator.state,
+        }
+        if self.civilization_version < 2:
+            return payload
+        payload["version"] = "civilization_global_state_v2"
+        camp = payload["camp"]
+        assert isinstance(camp, dict)
+        camp.update(
+            {
+                "food_lots": [self._food_lot_payload(lot) for lot in state.camp.food_lots],
+                "tool_stockpile": {
+                    tool: list(charges)
+                    for tool, charges in sorted(state.camp.tool_stockpile.items())
+                },
+            }
+        )
+        agents = payload["agents"]
+        assert isinstance(agents, dict)
+        for agent_id, agent_payload in agents.items():
+            agent = state.agents[agent_id]
+            assert isinstance(agent_payload, dict)
+            agent_payload.update(
+                {
+                    "life_state": agent.life_state,
+                    "downed_ticks": agent.downed_ticks,
+                    "downed_count": agent.downed_count,
+                    "revival_labor": agent.revival_labor,
+                    "revival_food_lot_id": agent.revival_food_lot_id,
+                    "food_lots": [self._food_lot_payload(lot) for lot in agent.food_lots],
+                    "tool_charges": dict(sorted(agent.tool_charges.items())),
+                }
+            )
+        payload["ground_piles"] = {
+            pile_id: {
+                "id": pile.id,
+                "x": pile.x,
+                "y": pile.y,
+                "item": pile.item,
+                "quantity": pile.quantity,
+                "origin_type": pile.origin_type,
+                "origin_id": pile.origin_id,
+                "created_tick": pile.created_tick,
+                "expires_tick": pile.expires_tick,
+            }
+            for pile_id, pile in sorted(state.ground_piles.items())
+        }
+        payload["ledger"] = list(state.ledger)
+        payload["spoiled_resources"] = dict(sorted(state.spoiled_resources.items()))
+        payload["resources"] = [
+            {
+                "id": f"resource-{x}-{y}",
+                "x": int(x),
+                "y": int(y),
+                "type": Resource(int(state.resource_ids[y, x])).name.lower(),
+                "quantity": int(state.resource_quantities[y, x]),
+            }
+            for y, x in np.argwhere(state.resource_quantities > 0)
+        ]
+        payload["conservation"] = self.reconcile_v2_ledger()
+        return payload
+
+    @staticmethod
+    def _food_lot_payload(lot: FoodLot) -> dict[str, object]:
+        return {
+            "lot_id": lot.id,
+            "kind": lot.kind,
+            "quantity": lot.quantity,
+            "origin_type": lot.origin_type,
+            "origin_id": lot.origin_id,
+            "created_tick": lot.created_tick,
+            "expires_tick": lot.expires_tick,
+            "preparation": lot.preparation,
         }
 
     def _initial_civilization_structures(self) -> dict[str, StructureState]:
@@ -1256,11 +1361,14 @@ class MultiAgentWorld:
     def _inside_fire_radius(self, x: int, y: int) -> bool:
         state = self._require_state()
         campfire = state.structures.get("campfire")
+        radius = 3
+        if self.civilization_version >= 2 and campfire and campfire.condition < 50:
+            radius = 2 if campfire.condition > 0 else 0
         return bool(
             campfire
             and campfire.complete
             and campfire.fuel > 0
-            and abs(campfire.x - x) + abs(campfire.y - y) <= 3
+            and abs(campfire.x - x) + abs(campfire.y - y) <= radius
         )
 
     def _inventory_total(self, agent: AgentState) -> int:
@@ -1306,6 +1414,9 @@ class MultiAgentWorld:
             "occupants": sorted(structure.occupants),
             "fuel": structure.fuel,
             "reserved_materials": dict(structure.reserved_materials),
+            "occupancy_order": list(structure.occupancy_order),
+            "repair_labor": structure.repair_labor,
+            "repair_material_reserved": structure.repair_material_reserved,
         }
 
     def _creature_payload(self, creature: CreatureState) -> dict[str, object]:
@@ -1338,7 +1449,7 @@ class MultiAgentWorld:
         """Return JSON-like survival economy metrics."""
 
         state = self._require_state()
-        return {
+        payload: dict[str, object] = {
             "step": state.step_count,
             "active_agents": len(self.alive_agents()),
             "deaths": state.deaths,
@@ -1366,6 +1477,39 @@ class MultiAgentWorld:
             "max_food_security_steps": state.max_food_security_steps,
             "shelter_completion_step": state.shelter_completion_step,
         }
+        if self.civilization_version >= 2:
+            from voyager.sim.core_v2 import contribution_metrics
+
+            payload.update(
+                {
+                    "life_states": {
+                        value: sum(agent.life_state == value for agent in state.agents.values())
+                        for value in ("active", "downed", "dead")
+                    },
+                    "tools": {
+                        "camp": {
+                            tool: len(charges)
+                            for tool, charges in sorted(state.camp.tool_stockpile.items())
+                        },
+                        "agents": {
+                            agent_id: {
+                                "owned": sorted(agent.tools),
+                                "equipped": agent.equipped_tool,
+                                "charges": dict(sorted(agent.tool_charges.items())),
+                            }
+                            for agent_id, agent in sorted(state.agents.items())
+                        },
+                    },
+                    "structures": {
+                        name: self._structure_payload(structure)
+                        for name, structure in sorted(state.structures.items())
+                    },
+                    "spoiled": dict(sorted(state.spoiled_resources.items())),
+                    "contributions": contribution_metrics(self),
+                    "conservation": self.reconcile_v2_ledger(),
+                }
+            )
+        return payload
 
     def _move(
         self,

@@ -22,6 +22,10 @@ web/dist/
 # Generated experiment outputs
 runs/*
 !runs/.gitkeep
+!runs/replays/
+runs/replays/*
+!runs/replays/civilization_deterministic_core_v1/
+!runs/replays/civilization_deterministic_core_v1/**
 logs/
 checkpoints/
 *.ckpt

@@ -1,0 +1,913 @@
+{
+  "agent_steps": 4940,
+  "artifacts": [
+    {
+      "bytes": 2155,
+      "end_tick": null,
+      "kind": "camera.json",
+      "path": "camera.json",
+      "sha256": "f16c03eff933165fc867c4c9806cc776bbf1c24e20c9dc4722fb7ed6f4dad818",
+      "start_tick": null
+    },
+    {
+      "bytes": 4949,
+      "end_tick": null,
+      "kind": "initial",
+      "path": "initial.json.gz",
+      "sha256": "55d3c14453b8eeb92a66672f9f5c4fe8922e39c143a4107dac25a150e7e78926",
+      "start_tick": null
+    },
+    {
+      "bytes": 3203,
+      "end_tick": null,
+      "kind": "ledger",
+      "path": "ledger.json.gz",
+      "sha256": "0cb194f2131ddbc431c91200a7a585c4f1ed2a8fa52c68f33994c12e852e84fd",
+      "start_tick": null
+    },
+    {
+      "bytes": 1632,
+      "end_tick": null,
+      "kind": "metrics",
+      "path": "metrics.json.gz",
+      "sha256": "98152113e45d71390bd56a51dd9f6b58b4128bc7aa3bc934c3d6552d91c2238f",
+      "start_tick": null
+    },
+    {
+      "bytes": 4949,
+      "end_tick": 0,
+      "kind": "snapshots",
+      "path": "snapshots/000000.json.gz",
+      "sha256": "55d3c14453b8eeb92a66672f9f5c4fe8922e39c143a4107dac25a150e7e78926",
+      "start_tick": 0
+    },
+    {
+      "bytes": 4774,
+      "end_tick": 25,
+      "kind": "snapshots",
+      "path": "snapshots/000025.json.gz",
+      "sha256": "110281686de29729d3b65bad20934e2545601d2a892893d1df4476d076f8be41",
+      "start_tick": 25
+    },
+    {
+      "bytes": 5214,
+      "end_tick": 50,
+      "kind": "snapshots",
+      "path": "snapshots/000050.json.gz",
+      "sha256": "60192537639f2191764ba8d11a52230f42218014cfec9e574699b1dbaab00cfe",
+      "start_tick": 50
+    },
+    {
+      "bytes": 5446,
+      "end_tick": 75,
+      "kind": "snapshots",
+      "path": "snapshots/000075.json.gz",
+      "sha256": "03cf676535dc05d1c35068f7d7766ebac712005150f81f26edf9cc8a53da56f6",
+      "start_tick": 75
+    },
+    {
+      "bytes": 5670,
+      "end_tick": 100,
+      "kind": "snapshots",
+      "path": "snapshots/000100.json.gz",
+      "sha256": "6a106b6c658314958657ca9f30658451adc6fa0186613bb0794d449e28b3f872",
+      "start_tick": 100
+    },
+    {
+      "bytes": 5881,
+      "end_tick": 125,
+      "kind": "snapshots",
+      "path": "snapshots/000125.json.gz",
+      "sha256": "9ff36cb55bb197dc3ac81c947861056aba78ef8650061c6721d8fe8862a11a09",
+      "start_tick": 125
+    },
+    {
+      "bytes": 6151,
+      "end_tick": 150,
+      "kind": "snapshots",
+      "path": "snapshots/000150.json.gz",
+      "sha256": "3e19379b33de5dc22340685328d25cf8eab1597c486daa15ed36df6ede32108b",
+      "start_tick": 150
+    },
+    {
+      "bytes": 6381,
+      "end_tick": 175,
+      "kind": "snapshots",
+      "path": "snapshots/000175.json.gz",
+      "sha256": "b1ac2c18055711e75fe6a8152e97b0115a332051793bbbab747c0a5fbec07d75",
+      "start_tick": 175
+    },
+    {
+      "bytes": 6586,
+      "end_tick": 200,
+      "kind": "snapshots",
+      "path": "snapshots/000200.json.gz",
+      "sha256": "93776087099222c2754b99351600cda933ca6f2347379ac44512e1bc523cd2cc",
+      "start_tick": 200
+    },
+    {
+      "bytes": 6655,
+      "end_tick": 225,
+      "kind": "snapshots",
+      "path": "snapshots/000225.json.gz",
+      "sha256": "823f3816f7a8f5e748938da0daf716a741e443ff15fc18ab4025f8f5f70384ea",
+      "start_tick": 225
+    },
+    {
+      "bytes": 6771,
+      "end_tick": 250,
+      "kind": "snapshots",
+      "path": "snapshots/000250.json.gz",
+      "sha256": "ed2577942a05e1f5112c7ad499350989e5f06e8901c0c7c20749b7593afe7a5d",
+      "start_tick": 250
+    },
+    {
+      "bytes": 6927,
+      "end_tick": 275,
+      "kind": "snapshots",
+      "path": "snapshots/000275.json.gz",
+      "sha256": "90c7c978456f6579e48fa87904ecd8749c429cec08be63503d7dd6a98be03dd1",
+      "start_tick": 275
+    },
+    {
+      "bytes": 6948,
+      "end_tick": 300,
+      "kind": "snapshots",
+      "path": "snapshots/000300.json.gz",
+      "sha256": "c3b3a5f7562f48de8a70083fd06f1faddeec5122b9bf9f8d5efe788236f110f9",
+      "start_tick": 300
+    },
+    {
+      "bytes": 7035,
+      "end_tick": 325,
+      "kind": "snapshots",
+      "path": "snapshots/000325.json.gz",
+      "sha256": "73f7dab29bc91b4e06ee8cacc47c934f4e13a48239a33582b4494843ad73cdbb",
+      "start_tick": 325
+    },
+    {
+      "bytes": 7164,
+      "end_tick": 350,
+      "kind": "snapshots",
+      "path": "snapshots/000350.json.gz",
+      "sha256": "61db18e30fad77c54484b27eea787fa1c59c31b0a2cf219fd752606183570482",
+      "start_tick": 350
+    },
+    {
+      "bytes": 7167,
+      "end_tick": 375,
+      "kind": "snapshots",
+      "path": "snapshots/000375.json.gz",
+      "sha256": "9957705d3004fef5ed33506bebd0d4493e1774e14172a84bbcde3bf4ab0af991",
+      "start_tick": 375
+    },
+    {
+      "bytes": 7173,
+      "end_tick": 400,
+      "kind": "snapshots",
+      "path": "snapshots/000400.json.gz",
+      "sha256": "3d298e0cde6592836d4aa7f158489e1289a95a69d58fa5ff385d4769f1b3d8e1",
+      "start_tick": 400
+    },
+    {
+      "bytes": 7172,
+      "end_tick": 425,
+      "kind": "snapshots",
+      "path": "snapshots/000425.json.gz",
+      "sha256": "62bb7ca32c71e8a950fa68b12868c0e3aebe4fa8bed64d0073d5986189d40a07",
+      "start_tick": 425
+    },
+    {
+      "bytes": 7170,
+      "end_tick": 450,
+      "kind": "snapshots",
+      "path": "snapshots/000450.json.gz",
+      "sha256": "bc52444df7525829d06a09f6765caa3f7d7553c82f8f3c5c879501bb475dae78",
+      "start_tick": 450
+    },
+    {
+      "bytes": 7173,
+      "end_tick": 475,
+      "kind": "snapshots",
+      "path": "snapshots/000475.json.gz",
+      "sha256": "c4ef4a70bce733db2ff67dc62110648d94df617f529e0e00d9baec10324dec96",
+      "start_tick": 475
+    },
+    {
+      "bytes": 7199,
+      "end_tick": 500,
+      "kind": "snapshots",
+      "path": "snapshots/000500.json.gz",
+      "sha256": "6b7c53d1e19bda2229fd75cfedaedabcb0964a2a842c8bf373323e9647877e6f",
+      "start_tick": 500
+    },
+    {
+      "bytes": 7196,
+      "end_tick": 525,
+      "kind": "snapshots",
+      "path": "snapshots/000525.json.gz",
+      "sha256": "4e81047d6141ddcf318100f8e189b86472f8382571714159a737e4334aae917d",
+      "start_tick": 525
+    },
+    {
+      "bytes": 7342,
+      "end_tick": 550,
+      "kind": "snapshots",
+      "path": "snapshots/000550.json.gz",
+      "sha256": "f952ce7fdfa3ea0c67448616a6ec51da8c4809c7a77b8b932eb6e5022f34216e",
+      "start_tick": 550
+    },
+    {
+      "bytes": 7497,
+      "end_tick": 575,
+      "kind": "snapshots",
+      "path": "snapshots/000575.json.gz",
+      "sha256": "07b11fc04b4e1440d29eeb9a8532e52881838eae40dbb4e8a6c89155255b0caa",
+      "start_tick": 575
+    },
+    {
+      "bytes": 7591,
+      "end_tick": 600,
+      "kind": "snapshots",
+      "path": "snapshots/000600.json.gz",
+      "sha256": "61c135a9398a59312d7d67afe65bd79423094b094f897cbb6ff2ba16fb38c070",
+      "start_tick": 600
+    },
+    {
+      "bytes": 80117,
+      "end_tick": 100,
+      "kind": "timeline",
+      "path": "timeline/000001-000100.json.gz",
+      "sha256": "deaa58b862adbef3b1fec9e9b79a35500d93f1a4e2c8686d6e131d91ef6d31d4",
+      "start_tick": 1
+    },
+    {
+      "bytes": 314640,
+      "end_tick": 200,
+      "kind": "timeline",
+      "path": "timeline/000101-000200.json.gz",
+      "sha256": "839b8a09d873ea03e006e49899638f253fd65dc6a9b1caf4a447ed59cc9f5e9a",
+      "start_tick": 101
+    },
+    {
+      "bytes": 363270,
+      "end_tick": 300,
+      "kind": "timeline",
+      "path": "timeline/000201-000300.json.gz",
+      "sha256": "7a123e3ef6cd56fb02beb0395100bac0f80fc0c0b49960d644a5b9981e4e522b",
+      "start_tick": 201
+    },
+    {
+      "bytes": 399496,
+      "end_tick": 400,
+      "kind": "timeline",
+      "path": "timeline/000301-000400.json.gz",
+      "sha256": "24458d151d1d53cd1f5bbbb5d022400df39c840cde21269dbf21a790be37811e",
+      "start_tick": 301
+    },
+    {
+      "bytes": 404604,
+      "end_tick": 500,
+      "kind": "timeline",
+      "path": "timeline/000401-000500.json.gz",
+      "sha256": "0f591e5ee013f879eb031468b135186cd7c23969aad576166930c6f153737f75",
+      "start_tick": 401
+    },
+    {
+      "bytes": 425262,
+      "end_tick": 600,
+      "kind": "timeline",
+      "path": "timeline/000501-000600.json.gz",
+      "sha256": "dd34ee0524e71b4502a22eaffe1b281922f4518cb85b3b5d61edaadead864b50",
+      "start_tick": 501
+    }
+  ],
+  "environment_config": {
+    "inventory_capacity": 10,
+    "local_view_size": 7,
+    "map_size": 48,
+    "max_steps": 600,
+    "num_agents": 10
+  },
+  "extensions": {
+    "ledger_artifact": "ledger.json.gz",
+    "playback_seconds": 300,
+    "privileged_policy": true
+  },
+  "manifest_sha256": "d3b41efbf15229f71a63dceefe75baa0786fb9ac21c9d6d55c1fe62ec73076e9",
+  "recorded_at": "2026-08-03T06:33:57.717178+00:00",
+  "registries": {
+    "achievements": [
+      {
+        "id": "first_food_gathered",
+        "label": "First Food Gathered"
+      },
+      {
+        "id": "first_wood_gathered",
+        "label": "First Wood Gathered"
+      },
+      {
+        "id": "first_stone_gathered",
+        "label": "First Stone Gathered"
+      },
+      {
+        "id": "first_deposit",
+        "label": "First Deposit"
+      },
+      {
+        "id": "first_food_withdrawal",
+        "label": "First Food Withdrawal"
+      },
+      {
+        "id": "camp_food_buffer_10",
+        "label": "Camp Food Buffer 10"
+      },
+      {
+        "id": "camp_food_buffer_20",
+        "label": "Camp Food Buffer 20"
+      },
+      {
+        "id": "shelter_25_percent",
+        "label": "Shelter 25 Percent"
+      },
+      {
+        "id": "shelter_50_percent",
+        "label": "Shelter 50 Percent"
+      },
+      {
+        "id": "shelter_complete",
+        "label": "Shelter Complete"
+      },
+      {
+        "id": "first_storm_survived",
+        "label": "First Storm Survived"
+      },
+      {
+        "id": "all_active_agents_alive_100",
+        "label": "All Active Agents Alive 100"
+      },
+      {
+        "id": "food_security_100_steps",
+        "label": "Food Security 100 Steps"
+      },
+      {
+        "id": "all_roles_contributed",
+        "label": "All Roles Contributed"
+      },
+      {
+        "id": "shared_food_transfer",
+        "label": "Shared Food Transfer"
+      },
+      {
+        "id": "no_deaths_run",
+        "label": "No Deaths Run"
+      },
+      {
+        "id": "workbench_complete",
+        "label": "Workbench Complete"
+      },
+      {
+        "id": "first_spear_crafted",
+        "label": "First Spear Crafted"
+      },
+      {
+        "id": "first_successful_hunt",
+        "label": "First Successful Hunt"
+      },
+      {
+        "id": "first_cooked_meal",
+        "label": "First Cooked Meal"
+      },
+      {
+        "id": "campfire_full_night",
+        "label": "Campfire Full Night"
+      },
+      {
+        "id": "full_shelter_protected_night",
+        "label": "Full Shelter Protected Night"
+      },
+      {
+        "id": "joint_construction_multiple_roles",
+        "label": "Joint Construction Multiple Roles"
+      },
+      {
+        "id": "first_stalker_defeated",
+        "label": "First Stalker Defeated"
+      },
+      {
+        "id": "first_ally_defense_kill",
+        "label": "First Ally Defense Kill"
+      }
+    ],
+    "actions": [
+      {
+        "id": "noop",
+        "label": "Noop",
+        "value": 0
+      },
+      {
+        "id": "move_up",
+        "label": "Move Up",
+        "value": 1
+      },
+      {
+        "id": "move_down",
+        "label": "Move Down",
+        "value": 2
+      },
+      {
+        "id": "move_left",
+        "label": "Move Left",
+        "value": 3
+      },
+      {
+        "id": "move_right",
+        "label": "Move Right",
+        "value": 4
+      },
+      {
+        "id": "gather",
+        "label": "Gather",
+        "value": 5
+      },
+      {
+        "id": "eat",
+        "label": "Eat",
+        "value": 6
+      },
+      {
+        "id": "rest",
+        "label": "Rest",
+        "value": 7
+      },
+      {
+        "id": "deposit_food",
+        "label": "Deposit Food",
+        "value": 8
+      },
+      {
+        "id": "deposit_wood",
+        "label": "Deposit Wood",
+        "value": 9
+      },
+      {
+        "id": "deposit_stone",
+        "label": "Deposit Stone",
+        "value": 10
+      },
+      {
+        "id": "withdraw_food",
+        "label": "Withdraw Food",
+        "value": 11
+      },
+      {
+        "id": "build_shelter",
+        "label": "Build Shelter",
+        "value": 12
+      }
+    ],
+    "arguments": [
+      {
+        "id": "none",
+        "label": "None",
+        "value": 0
+      },
+      {
+        "id": "north",
+        "label": "North",
+        "value": 1
+      },
+      {
+        "id": "east",
+        "label": "East",
+        "value": 2
+      },
+      {
+        "id": "south",
+        "label": "South",
+        "value": 3
+      },
+      {
+        "id": "west",
+        "label": "West",
+        "value": 4
+      },
+      {
+        "id": "food",
+        "label": "Food",
+        "value": 5
+      },
+      {
+        "id": "wood",
+        "label": "Wood",
+        "value": 6
+      },
+      {
+        "id": "stone",
+        "label": "Stone",
+        "value": 7
+      },
+      {
+        "id": "raw_meat",
+        "label": "Raw_Meat",
+        "value": 8
+      },
+      {
+        "id": "cooked_meat",
+        "label": "Cooked_Meat",
+        "value": 9
+      },
+      {
+        "id": "axe_recipe",
+        "label": "Axe_Recipe",
+        "value": 10
+      },
+      {
+        "id": "pickaxe_recipe",
+        "label": "Pickaxe_Recipe",
+        "value": 11
+      },
+      {
+        "id": "spear_recipe",
+        "label": "Spear_Recipe",
+        "value": 12
+      },
+      {
+        "id": "torch_recipe",
+        "label": "Torch_Recipe",
+        "value": 13
+      },
+      {
+        "id": "pack_recipe",
+        "label": "Pack_Recipe",
+        "value": 14
+      },
+      {
+        "id": "cook_meat_recipe",
+        "label": "Cook_Meat_Recipe",
+        "value": 15
+      },
+      {
+        "id": "axe",
+        "label": "Axe",
+        "value": 16
+      },
+      {
+        "id": "pickaxe",
+        "label": "Pickaxe",
+        "value": 17
+      },
+      {
+        "id": "spear",
+        "label": "Spear",
+        "value": 18
+      },
+      {
+        "id": "torch",
+        "label": "Torch",
+        "value": 19
+      },
+      {
+        "id": "pack",
+        "label": "Pack",
+        "value": 20
+      },
+      {
+        "id": "workbench",
+        "label": "Workbench",
+        "value": 21
+      },
+      {
+        "id": "campfire",
+        "label": "Campfire",
+        "value": 22
+      },
+      {
+        "id": "shelter",
+        "label": "Shelter",
+        "value": 23
+      }
+    ],
+    "events": [
+      {
+        "id": "action",
+        "label": "Action"
+      },
+      {
+        "id": "gather",
+        "label": "Gather"
+      },
+      {
+        "id": "deposit",
+        "label": "Deposit"
+      },
+      {
+        "id": "withdraw",
+        "label": "Withdraw"
+      },
+      {
+        "id": "build",
+        "label": "Build"
+      },
+      {
+        "id": "eat",
+        "label": "Eat"
+      },
+      {
+        "id": "death",
+        "label": "Death"
+      },
+      {
+        "id": "storm_started",
+        "label": "Storm Started"
+      },
+      {
+        "id": "storm_ended",
+        "label": "Storm Ended"
+      },
+      {
+        "id": "achievement",
+        "label": "Achievement"
+      },
+      {
+        "id": "shared_food_transfer",
+        "label": "Shared Food Transfer"
+      }
+    ],
+    "metrics": [
+      {
+        "id": "survivors",
+        "label": "Survivors"
+      },
+      {
+        "id": "mean_health",
+        "label": "Mean Health"
+      },
+      {
+        "id": "mean_hunger",
+        "label": "Mean Hunger"
+      },
+      {
+        "id": "mean_energy",
+        "label": "Mean Energy"
+      },
+      {
+        "id": "camp_food",
+        "label": "Camp Food"
+      },
+      {
+        "id": "camp_wood",
+        "label": "Camp Wood"
+      },
+      {
+        "id": "camp_stone",
+        "label": "Camp Stone"
+      },
+      {
+        "id": "shelter_progress",
+        "label": "Shelter Progress"
+      },
+      {
+        "id": "food_security_duration",
+        "label": "Food Security Duration"
+      }
+    ],
+    "resources": [
+      {
+        "id": "food",
+        "label": "Food",
+        "value": 1
+      },
+      {
+        "id": "wood",
+        "label": "Wood",
+        "value": 2
+      },
+      {
+        "id": "stone",
+        "label": "Stone",
+        "value": 3
+      }
+    ],
+    "roles": [
+      {
+        "id": "builder",
+        "label": "Builder"
+      },
+      {
+        "id": "forager",
+        "label": "Forager"
+      },
+      {
+        "id": "woodcutter",
+        "label": "Woodcutter"
+      }
+    ],
+    "structures": [
+      {
+        "id": "camp",
+        "label": "Camp"
+      },
+      {
+        "id": "shelter",
+        "label": "Shelter"
+      }
+    ],
+    "terrain": [
+      {
+        "id": "water",
+        "label": "Water",
+        "value": 0
+      },
+      {
+        "id": "beach",
+        "label": "Beach",
+        "value": 1
+      },
+      {
+        "id": "grass",
+        "label": "Grass",
+        "value": 2
+      },
+      {
+        "id": "forest",
+        "label": "Forest",
+        "value": 3
+      },
+      {
+        "id": "quarry",
+        "label": "Quarry",
+        "value": 4
+      },
+      {
+        "id": "rocky_highland",
+        "label": "Rocky_Highland",
+        "value": 5
+      },
+      {
+        "id": "cave",
+        "label": "Cave",
+        "value": 6
+      }
+    ],
+    "verbs": [
+      {
+        "id": "noop",
+        "label": "Noop",
+        "value": 0
+      },
+      {
+        "id": "move",
+        "label": "Move",
+        "value": 1
+      },
+      {
+        "id": "interact",
+        "label": "Interact",
+        "value": 2
+      },
+      {
+        "id": "eat",
+        "label": "Eat",
+        "value": 3
+      },
+      {
+        "id": "rest",
+        "label": "Rest",
+        "value": 4
+      },
+      {
+        "id": "deposit",
+        "label": "Deposit",
+        "value": 5
+      },
+      {
+        "id": "withdraw",
+        "label": "Withdraw",
+        "value": 6
+      },
+      {
+        "id": "craft",
+        "label": "Craft",
+        "value": 7
+      },
+      {
+        "id": "work",
+        "label": "Work",
+        "value": 8
+      },
+      {
+        "id": "use",
+        "label": "Use",
+        "value": 9
+      },
+      {
+        "id": "attack",
+        "label": "Attack",
+        "value": 10
+      },
+      {
+        "id": "defend",
+        "label": "Defend",
+        "value": 11
+      },
+      {
+        "id": "give",
+        "label": "Give",
+        "value": 12
+      },
+      {
+        "id": "equip",
+        "label": "Equip",
+        "value": 13
+      },
+      {
+        "id": "repair",
+        "label": "Repair",
+        "value": 14
+      },
+      {
+        "id": "revive",
+        "label": "Revive",
+        "value": 15
+      }
+    ]
+  },
+  "replay_id": "civilization_deterministic_core_v1",
+  "source": {
+    "benchmark_episode": null,
+    "benchmark_id": null,
+    "checkpoint": null,
+    "checkpoint_sha256": null,
+    "dependency_versions": {},
+    "evaluation_seed": 7,
+    "git_revision": null,
+    "inference_mode": "privileged_deterministic",
+    "policy_id": "civilization_deterministic_core_script_v1",
+    "policy_kind": "scripted",
+    "source_fingerprint": "ebe55aa825e2983a645336ee7e7957b1a5b5c12966e94c00faa80ab3ad0b9d13",
+    "training_seed": null
+  },
+  "status": "complete",
+  "tags": [
+    "stage7b",
+    "deterministic-core",
+    "scripted",
+    "public-actions"
+  ],
+  "terminal_summary": {
+    "achievements": [
+      "all_active_agents_alive_100",
+      "all_roles_contributed",
+      "camp_food_buffer_10",
+      "campfire_full_night",
+      "food_security_100_steps",
+      "joint_construction_multiple_roles",
+      "shelter_25_percent",
+      "shelter_50_percent",
+      "shelter_complete",
+      "workbench_complete"
+    ],
+    "agent_steps": 4940,
+    "camp_stockpile": {
+      "cooked_meat": 0,
+      "food": 10,
+      "raw_meat": 0,
+      "stone": 0,
+      "wood": 7
+    },
+    "conservation": {},
+    "deaths": 7,
+    "downings": 8,
+    "invalid_scripted_actions": 0,
+    "revivals": 1,
+    "state_hash": "11b4f05350e8f519d9d791c4d019729372b103122dd3498b67b4308b6f276d6b",
+    "structures": {
+      "campfire": {
+        "complete": true,
+        "condition": 100
+      },
+      "shelter": {
+        "complete": true,
+        "condition": 100
+      },
+      "workbench": {
+        "complete": true,
+        "condition": 100
+      }
+    },
+    "survivors": 3,
+    "world_steps": 600
+  },
+  "tick_rate": 2,
+  "versions": {
+    "achievement": "civilization_achievements_v1",
+    "action": "civilization_structured_action_v2",
+    "environment": "voyager_civilization_v2",
+    "observation": "civilization_local_observation_v2",
+    "replay": "stage7_replay_2.2.0",
+    "reward": "civilization_reward_v1",
+    "scenario": "voyager_civilization_vertical_slice_v1"
+  },
+  "world_steps": 600
+}

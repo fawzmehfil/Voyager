@@ -649,7 +649,7 @@ def _world_state(env: VoyagerParallelEnv) -> Any:
 def _world_snapshot(env: VoyagerParallelEnv) -> dict[str, Any]:
     state = _world_state(env)
     civilization = bool(state.structures)
-    return {
+    payload: dict[str, Any] = {
         "camp": {
             "id": "camp",
             "x": state.camp.x,
@@ -721,6 +721,53 @@ def _world_snapshot(env: VoyagerParallelEnv) -> dict[str, Any]:
         "time": env.world.civilization_time() if civilization else None,
         "extensions": {"scenario_id": state.scenario_id},
     }
+    if getattr(env.world, "civilization_version", 1) < 2:
+        return payload
+    payload["camp"].update(
+        {
+            "food_lots": [env.world._food_lot_payload(lot) for lot in state.camp.food_lots],
+            "tool_stockpile": {
+                tool: list(charges)
+                for tool, charges in sorted(state.camp.tool_stockpile.items())
+            },
+        }
+    )
+    for agent_payload, (_agent_id, agent) in zip(
+        payload["agents"], sorted(state.agents.items()), strict=True
+    ):
+        agent_payload.update(
+            {
+                "life_state": agent.life_state,
+                "downed_ticks": agent.downed_ticks,
+                "revival_labor": agent.revival_labor,
+                "food_lots": [env.world._food_lot_payload(lot) for lot in agent.food_lots],
+                "tools": sorted(agent.tools),
+                "equipped_tool": agent.equipped_tool,
+                "tool_charges": dict(sorted(agent.tool_charges.items())),
+            }
+        )
+    payload["ground_piles"] = [
+        {
+            "id": pile.id,
+            "x": pile.x,
+            "y": pile.y,
+            "item": pile.item,
+            "quantity": pile.quantity,
+            "origin_type": pile.origin_type,
+            "origin_id": pile.origin_id,
+            "created_tick": pile.created_tick,
+            "expires_tick": pile.expires_tick,
+        }
+        for pile in sorted(state.ground_piles.values(), key=lambda value: value.id)
+    ]
+    payload["ledger"] = list(state.ledger)
+    payload["conservation"] = env.world.reconcile_v2_ledger()
+    payload["extensions"] = {
+        **payload["extensions"],
+        "civilization_interface": 2,
+        "spoiled_resources": dict(sorted(state.spoiled_resources.items())),
+    }
+    return payload
 
 
 def _agent_snapshot(agent_id: str, agent: Any, index: int) -> dict[str, Any]:
@@ -757,7 +804,7 @@ def _state_delta(previous: dict[str, Any], current: dict[str, Any]) -> dict[str,
             if resource_id in current_resources
             else {**previous_resources[resource_id], "type": "none", "quantity": 0}
         )
-    return {
+    delta = {
         "camp": current["camp"],
         "agents": current["agents"],
         "structures": current["structures"],
@@ -767,6 +814,10 @@ def _state_delta(previous: dict[str, Any], current: dict[str, Any]) -> dict[str,
         "achievements": current["achievements"],
         "extensions": current.get("extensions", {}),
     }
+    for key in ("ground_piles", "ledger", "conservation"):
+        if key in current:
+            delta[key] = current[key]
+    return delta
 
 
 def apply_state_delta(state: dict[str, Any], delta: dict[str, Any]) -> dict[str, Any]:
@@ -778,7 +829,7 @@ def apply_state_delta(state: dict[str, Any], delta: dict[str, Any]) -> dict[str,
             resources.pop(change["id"], None)
         else:
             resources[change["id"]] = dict(change)
-    return {
+    result = {
         **state,
         "camp": delta["camp"],
         "agents": delta["agents"],
@@ -789,6 +840,10 @@ def apply_state_delta(state: dict[str, Any], delta: dict[str, Any]) -> dict[str,
         "achievements": delta["achievements"],
         "extensions": {**state.get("extensions", {}), **delta.get("extensions", {})},
     }
+    for key in ("ground_piles", "ledger", "conservation"):
+        if key in delta:
+            result[key] = delta[key]
+    return result
 
 
 def _event_from_agent_info(

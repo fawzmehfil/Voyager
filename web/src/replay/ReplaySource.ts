@@ -5,6 +5,7 @@ import type {
   ReplayResource,
   ReplayStructure,
   ReplayCreature,
+  ReplayGroundPile,
   ReplayTime,
   ResourceType,
   TerrainType,
@@ -31,6 +32,7 @@ interface V2Initial {
   agents: Array<Omit<ReplayAgent, "action" | "event">>;
   structures?: ReplayStructure[];
   creatures?: ReplayCreature[];
+  ground_piles?: ReplayGroundPile[];
   time?: ReplayTime | null;
 }
 
@@ -44,6 +46,7 @@ interface TimelineRecord {
     resource_changes: Array<ReplayResource & { id: string }>;
     structures?: ReplayStructure[];
     creatures?: ReplayCreature[];
+    ground_piles?: ReplayGroundPile[];
     time?: ReplayTime | null;
   };
   achievements: string[];
@@ -171,6 +174,7 @@ export function adaptV2ToRenderer(
       new_achievements: record.achievements,
       structures: record.state_delta.structures,
       creatures: record.state_delta.creatures,
+      ground_piles: record.state_delta.ground_piles,
       time: record.state_delta.time,
     };
   });
@@ -205,6 +209,7 @@ export function adaptV2ToRenderer(
         agents: initialAgents,
         structures: initial.structures,
         creatures: initial.creatures,
+        ground_piles: initial.ground_piles,
         time: initial.time,
       },
     },
