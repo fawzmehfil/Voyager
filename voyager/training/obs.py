@@ -11,6 +11,7 @@ Observation = Mapping[str, np.ndarray]
 
 COMPACT_OBSERVATION_ENCODER = "compact_structured_210_v1"
 CIVILIZATION_V2_OBSERVATION_ENCODER = "civilization_v2_flat_v1"
+CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER = "civilization_v2_identity_flat_v2"
 
 OBSERVATION_KEYS = ("local_view", "stats", "inventory", "role", "camp", "progress")
 CIVILIZATION_V2_OBSERVATION_KEYS = (
@@ -25,6 +26,10 @@ CIVILIZATION_V2_OBSERVATION_KEYS = (
     "camp",
     "entity_slots",
 )
+CIVILIZATION_V2_IDENTITY_OBSERVATION_KEYS = (
+    *CIVILIZATION_V2_OBSERVATION_KEYS,
+    "agent_identity",
+)
 
 
 def flatten_observation(
@@ -33,8 +38,16 @@ def flatten_observation(
 ) -> np.ndarray:
     """Convert a Voyager dict observation into one normalized float32 vector."""
 
-    if encoder_id == CIVILIZATION_V2_OBSERVATION_ENCODER:
-        return _flatten_civilization_v2_observation(observation)
+    if encoder_id in {
+        CIVILIZATION_V2_OBSERVATION_ENCODER,
+        CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER,
+    }:
+        keys = (
+            CIVILIZATION_V2_IDENTITY_OBSERVATION_KEYS
+            if encoder_id == CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER
+            else CIVILIZATION_V2_OBSERVATION_KEYS
+        )
+        return _flatten_civilization_v2_observation(observation, keys)
     if encoder_id != COMPACT_OBSERVATION_ENCODER:
         raise ValueError(f"Unknown observation encoder: {encoder_id!r}.")
     local_view = _normalize_local_view(np.asarray(observation["local_view"]))
@@ -72,14 +85,15 @@ def flat_observation_size(
     """Return the flattened vector length for Voyager's observation space."""
 
     spaces = observation_space.spaces
-    keys = (
-        CIVILIZATION_V2_OBSERVATION_KEYS
-        if encoder_id == CIVILIZATION_V2_OBSERVATION_ENCODER
-        else OBSERVATION_KEYS
-    )
+    keys: tuple[str, ...] = OBSERVATION_KEYS
+    if encoder_id == CIVILIZATION_V2_OBSERVATION_ENCODER:
+        keys = CIVILIZATION_V2_OBSERVATION_KEYS
+    elif encoder_id == CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER:
+        keys = CIVILIZATION_V2_IDENTITY_OBSERVATION_KEYS
     if encoder_id not in {
         COMPACT_OBSERVATION_ENCODER,
         CIVILIZATION_V2_OBSERVATION_ENCODER,
+        CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER,
     }:
         raise ValueError(f"Unknown observation encoder: {encoder_id!r}.")
     size = 0
@@ -101,8 +115,11 @@ def _normalize_local_view(local_view: np.ndarray) -> np.ndarray:
     return np.clip(normalized, 0.0, 1.0)
 
 
-def _flatten_civilization_v2_observation(observation: Observation) -> np.ndarray:
-    missing = set(CIVILIZATION_V2_OBSERVATION_KEYS) - set(observation)
+def _flatten_civilization_v2_observation(
+    observation: Observation,
+    keys: tuple[str, ...],
+) -> np.ndarray:
+    missing = set(keys) - set(observation)
     if missing:
         raise ValueError(
             "Civilization v2 observation is missing: " + ", ".join(sorted(missing))
@@ -119,7 +136,7 @@ def _flatten_civilization_v2_observation(observation: Observation) -> np.ndarray
     normalized_tiles[..., 5] /= 255.0
     normalized_tiles[..., 6] /= 255.0
     parts = [np.clip(normalized_tiles, 0.0, 1.0).reshape(-1)]
-    for key in CIVILIZATION_V2_OBSERVATION_KEYS[1:]:
+    for key in keys[1:]:
         values = np.asarray(observation[key], dtype=np.float32)
         if key == "entity_slots":
             values = np.clip(values, -1.0, 1.0)

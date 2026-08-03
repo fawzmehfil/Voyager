@@ -1,13 +1,19 @@
-"""Outcome-based evaluation for the Stage 7C trainability probe."""
+"""Outcome and behavior diagnostics for the Stage 7C trainability probe."""
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from collections import Counter
+from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
 import numpy as np
 
-from voyager.sim.registries_v2 import V2_FLAT_ACTION_COUNT
+from voyager.sim.registries_v2 import (
+    V2_FLAT_ACTION_COUNT,
+    CivilizationV2Argument,
+    CivilizationV2Verb,
+    unflatten_v2_action,
+)
 from voyager.training.civilization_probe import CivilizationProbeRewardWrapper
 from voyager.training.environments import (
     CIVILIZATION_PROBE_REWARD_CONTRACT,
@@ -18,16 +24,18 @@ from voyager.training.masking import stack_action_masks
 from voyager.training.obs import flatten_observations
 
 ProbePolicy = Literal["legal_random", "model"]
+WORKBENCH_WOOD = 6
+WORKBENCH_STONE = 2
 PROBE_METRICS = (
-    "gathered_wood_and_stone",
-    "deposited_wood_and_stone",
+    "gathered_workbench_bundle_by_100",
+    "workbench_materials_available_by_300",
     "workbench_complete",
     "any_tool_crafted",
     "majority_active_at_300",
 )
 PROBE_THRESHOLDS = {
-    "gathered_wood_and_stone": 0.50,
-    "deposited_wood_and_stone": 0.30,
+    "gathered_workbench_bundle_by_100": 0.50,
+    "workbench_materials_available_by_300": 0.30,
     "workbench_complete": 0.20,
     "any_tool_crafted": 0.10,
     "majority_active_at_300": 0.80,
@@ -43,8 +51,8 @@ class CivilizationEpisodeResult:
     world_steps: int
     agent_transitions: int
     shared_return: float
-    gathered_wood_and_stone: bool
-    deposited_wood_and_stone: bool
+    gathered_workbench_bundle_by_100: bool
+    workbench_materials_available_by_300: bool
     workbench_complete: bool
     any_tool_crafted: bool
     majority_active_at_300: bool
@@ -53,6 +61,17 @@ class CivilizationEpisodeResult:
     deaths: int
     invalid_actions: int
     submitted_actions: int
+    gathered_wood_and_stone: bool = False
+    deposited_wood_and_stone: bool = False
+    gathered_counts: dict[str, int] = field(default_factory=dict)
+    deposited_counts: dict[str, int] = field(default_factory=dict)
+    peak_camp_stockpile: dict[str, int] = field(default_factory=dict)
+    workbench_bundle_gather_tick: int | None = None
+    workbench_completion_tick: int | None = None
+    first_tool_tick: int | None = None
+    rejection_reasons: dict[str, int] = field(default_factory=dict)
+    selected_verbs: dict[str, int] = field(default_factory=dict)
+    selected_actions: dict[str, int] = field(default_factory=dict)
 
     @property
     def composite(self) -> float:
@@ -73,12 +92,13 @@ def run_civilization_episode(
     seed: int,
     model: Any | None = None,
     deterministic: bool = True,
+    reward_contract: str = CIVILIZATION_PROBE_REWARD_CONTRACT,
 ) -> CivilizationEpisodeResult:
     """Run one handcrafted v2 episode with legal-random or model actions."""
 
     training_environment = make_training_environment(
         environment_id=CIVILIZATION_V2_TRAINING_ENVIRONMENT,
-        reward_contract=CIVILIZATION_PROBE_REWARD_CONTRACT,
+        reward_contract=reward_contract,
         num_agents=10,
         map_size=48,
         max_steps=600,
@@ -100,6 +120,18 @@ def run_civilization_episode(
     invalid_actions = 0
     submitted_actions = 0
     active_at_300 = 0
+    gathered_by_100: Counter[str] = Counter()
+    gathered_counts: Counter[str] = Counter()
+    deposited_counts: Counter[str] = Counter()
+    peak_camp_stockpile: Counter[str] = Counter()
+    rejection_reasons: Counter[str] = Counter()
+    selected_verbs: Counter[str] = Counter()
+    selected_actions: Counter[str] = Counter()
+    workbench_materials_available_by_300 = False
+    workbench_bundle_gather_tick: int | None = None
+    workbench_completion_tick: int | None = None
+    first_tool_tick: int | None = None
+    ledger_cursor = 0
 
     while env.agents:
         agent_ids = tuple(env.agents)
@@ -138,6 +170,15 @@ def run_civilization_episode(
                 for index, agent_id in enumerate(agent_ids)
             }
 
+        for action in actions.values():
+            verb_value, argument_value, target = unflatten_v2_action(action)
+            verb = CivilizationV2Verb(verb_value).name.lower()
+            argument = CivilizationV2Argument(argument_value).name.lower()
+            selected_verbs[verb] += 1
+            selected_actions[
+                f"{verb}:{argument}:{'targeted' if target else 'untargeted'}"
+            ] += 1
+
         observations, rewards, _terminations, _truncations, infos = env.step(actions)
         agent_transitions += len(agent_ids)
         submitted_actions += len(agent_ids)
@@ -149,6 +190,46 @@ def run_civilization_episode(
             shared_return += float(next(iter(rewards.values())))
         state = env.world.state
         assert state is not None
+        new_ledger = state.ledger[ledger_cursor:]
+        ledger_cursor = len(state.ledger)
+        for entry in new_ledger:
+            event = str(entry.get("event", ""))
+            item = str(entry.get("item", ""))
+            quantity = _integer(entry.get("quantity", 0), "ledger quantity")
+            if event == "gather" and item:
+                gathered_counts[item] += quantity
+                if state.step_count <= 100:
+                    gathered_by_100[item] += quantity
+            elif event == "deposit" and item:
+                deposited_counts[item] += quantity
+            elif event == "craft_tool" and first_tool_tick is None:
+                first_tool_tick = state.step_count
+        for event in state.events:
+            if event.get("type") != "intent_rejected":
+                continue
+            payload = event.get("payload", {})
+            if isinstance(payload, dict):
+                rejection_reasons[str(payload.get("reason", "unknown"))] += 1
+
+        for item in ("food", "wood", "stone"):
+            peak_camp_stockpile[item] = max(
+                peak_camp_stockpile[item],
+                state.camp.stockpile.get(item, 0),
+            )
+        if (
+            workbench_bundle_gather_tick is None
+            and gathered_counts["wood"] >= WORKBENCH_WOOD
+            and gathered_counts["stone"] >= WORKBENCH_STONE
+        ):
+            workbench_bundle_gather_tick = state.step_count
+        if (
+            state.step_count <= 300
+            and state.camp.stockpile.get("wood", 0) >= WORKBENCH_WOOD
+            and state.camp.stockpile.get("stone", 0) >= WORKBENCH_STONE
+        ):
+            workbench_materials_available_by_300 = True
+        if state.structures["workbench"].complete and workbench_completion_tick is None:
+            workbench_completion_tick = state.step_count
         if state.step_count == 300:
             active_at_300 = sum(
                 agent.life_state == "active" for agent in state.agents.values()
@@ -156,28 +237,19 @@ def run_civilization_episode(
 
     state = env.world.state
     assert state is not None
-    gathered = {
-        str(entry.get("item"))
-        for entry in state.ledger
-        if entry.get("event") == "gather"
-    }
-    deposited = {
-        str(entry.get("item"))
-        for entry in state.ledger
-        if entry.get("event") == "deposit"
-    }
     result = CivilizationEpisodeResult(
         policy=policy_name,
         seed=seed,
         world_steps=state.step_count,
         agent_transitions=agent_transitions,
         shared_return=shared_return,
-        gathered_wood_and_stone={"wood", "stone"} <= gathered,
-        deposited_wood_and_stone={"wood", "stone"} <= deposited,
-        workbench_complete=state.structures["workbench"].complete,
-        any_tool_crafted=any(
-            entry.get("event") == "craft_tool" for entry in state.ledger
+        gathered_workbench_bundle_by_100=(
+            gathered_by_100["wood"] >= WORKBENCH_WOOD
+            and gathered_by_100["stone"] >= WORKBENCH_STONE
         ),
+        workbench_materials_available_by_300=workbench_materials_available_by_300,
+        workbench_complete=state.structures["workbench"].complete,
+        any_tool_crafted=first_tool_tick is not None,
         majority_active_at_300=active_at_300 >= 6,
         active_at_300=active_at_300,
         final_active=sum(
@@ -186,6 +258,21 @@ def run_civilization_episode(
         deaths=sum(agent.life_state == "dead" for agent in state.agents.values()),
         invalid_actions=invalid_actions,
         submitted_actions=submitted_actions,
+        gathered_wood_and_stone=(
+            gathered_counts["wood"] > 0 and gathered_counts["stone"] > 0
+        ),
+        deposited_wood_and_stone=(
+            deposited_counts["wood"] > 0 and deposited_counts["stone"] > 0
+        ),
+        gathered_counts=dict(sorted(gathered_counts.items())),
+        deposited_counts=dict(sorted(deposited_counts.items())),
+        peak_camp_stockpile=dict(sorted(peak_camp_stockpile.items())),
+        workbench_bundle_gather_tick=workbench_bundle_gather_tick,
+        workbench_completion_tick=workbench_completion_tick,
+        first_tool_tick=first_tool_tick,
+        rejection_reasons=dict(sorted(rejection_reasons.items())),
+        selected_verbs=dict(sorted(selected_verbs.items())),
+        selected_actions=dict(sorted(selected_actions.items())),
     )
     env.close()
     return result
@@ -198,6 +285,7 @@ def evaluate_civilization_policy(
     seeds: list[int],
     model: Any | None = None,
     deterministic: bool = True,
+    reward_contract: str = CIVILIZATION_PROBE_REWARD_CONTRACT,
 ) -> list[CivilizationEpisodeResult]:
     """Evaluate one policy on a caller-owned deterministic seed set."""
 
@@ -208,6 +296,7 @@ def evaluate_civilization_policy(
             seed=seed,
             model=model,
             deterministic=deterministic,
+            reward_contract=reward_contract,
         )
         for seed in seeds
     ]
@@ -216,10 +305,11 @@ def evaluate_civilization_policy(
 def summarize_civilization_results(
     results: list[CivilizationEpisodeResult],
 ) -> dict[str, object]:
-    """Aggregate the five predeclared capability rates and diagnostics."""
+    """Aggregate predeclared capability rates and behavioral diagnostics."""
 
     if not results:
         raise ValueError("At least one episode result is required.")
+    submitted = sum(result.submitted_actions for result in results)
     return {
         "policy": results[0].policy,
         "episodes": len(results),
@@ -229,12 +319,34 @@ def summarize_civilization_results(
             metric: float(np.mean([float(getattr(result, metric)) for result in results]))
             for metric in PROBE_METRICS
         },
+        "legacy_diagnostic_rates": {
+            metric: float(np.mean([float(getattr(result, metric)) for result in results]))
+            for metric in ("gathered_wood_and_stone", "deposited_wood_and_stone")
+        },
         "mean_active_at_300": float(
             np.mean([result.active_at_300 for result in results])
         ),
         "mean_final_active": float(np.mean([result.final_active for result in results])),
         "invalid_action_rate": sum(result.invalid_actions for result in results)
-        / max(1, sum(result.submitted_actions for result in results)),
+        / max(1, submitted),
+        "rejection_reason_rates": {
+            reason: count / max(1, submitted)
+            for reason, count in _sum_counters(
+                result.rejection_reasons for result in results
+            ).items()
+        },
+        "selected_verb_rates": {
+            verb: count / max(1, submitted)
+            for verb, count in _sum_counters(
+                result.selected_verbs for result in results
+            ).items()
+        },
+        "mean_gathered_counts": _mean_counters(
+            [result.gathered_counts for result in results]
+        ),
+        "mean_deposited_counts": _mean_counters(
+            [result.deposited_counts for result in results]
+        ),
         "mean_shared_return": float(
             np.mean([result.shared_return for result in results])
         ),
@@ -290,6 +402,24 @@ def compare_against_random(
         and float(lower) > 0.0
         and all(capability_passes.values()),
     }
+
+
+def _sum_counters(rows: Any) -> Counter[str]:
+    result: Counter[str] = Counter()
+    for row in rows:
+        result.update(row)
+    return result
+
+
+def _mean_counters(rows: list[dict[str, int]]) -> dict[str, float]:
+    totals = _sum_counters(rows)
+    return {key: value / len(rows) for key, value in sorted(totals.items())}
+
+
+def _integer(value: object, name: str) -> int:
+    if not isinstance(value, int):
+        raise TypeError(f"{name} must be an integer.")
+    return value
 
 
 def _probabilities(logits: np.ndarray) -> np.ndarray:

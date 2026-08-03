@@ -21,11 +21,12 @@ food-lot provenance and spoilage, ground piles, structure damage and repair, dow
 revival, and an append-only conservation/contribution ledger. Replay 2.2 records those
 facts without changing the Stage 7A replay or `VoyagerCivilization-v1` contract.
 
-The Stage 7C trainability probe is implemented but has not been run at full scale. It
-connects the shared feed-forward PPO trainer to the v2 observation and 270-action masked
-registry, evaluates five early capabilities against seed-matched legal-random play, and
-records component-level throughput. Procedural generation remains gated on the result of
-the two-million-transition experiment.
+The first Stage 7C trainability probe completed two million transitions and failed: PPO
+learned no production capability and scored below legal-random play. That result is kept as
+`civilization_trainability_probe_v1`. The v2 remediation makes construction masks honest,
+adds a non-privileged agent identity for shared-policy symmetry breaking, uses bounded
+dense progression rewards, and replaces saturated metrics with timed economic outcomes.
+Procedural generation remains gated on a successful trainability result.
 
 ## Why This Exists
 
@@ -164,21 +165,23 @@ When a PPO checkpoint is provided, evaluation always prints separate `ppo_determ
 
 `--total-steps` counts agent transitions, not only world ticks. With `10` agents and `128` rollout steps, one PPO update collects up to `1280` training samples. Entropy decays linearly across those agent transitions from `--entropy-coef-start` to `--entropy-coef-end`.
 
-Run the Stage 7C handcrafted-island trainability gate when ready:
+Run the Stage 7C v2 250K remediation pilot first:
 
 ```bash
 .venv-train/bin/python examples/run_stage7c_trainability_probe.py \
-  --total-agent-transitions 2000000 \
+  --total-agent-transitions 250000 \
   --seed 0 \
-  --output-dir results/stage7c/ppo_seed0
+  --dev-episodes 10 \
+  --test-episodes 20 \
+  --evaluation-milestones 250000 \
+  --output-dir results/stage7c/ppo_probe_v2_250k_seed0
 ```
 
-This is the full experiment, not a required test-suite step. It trains one shared
-`[128, 128]` feed-forward policy for all ten agents, evaluates checkpoints at the
-predeclared milestones, selects on ten development seeds, and evaluates the selected
-checkpoint against legal-random play on fifty separate held-out seeds. The output includes
-config, training history, checkpoints, episode-level capability outcomes, the paired
-bootstrap comparison, and a timing breakdown with a five-million-transition projection.
+This pilot is a continuation decision, not the full pass gate. Continue to two million
+transitions only if PPO exceeds random, gathers the workbench bundle promptly, produces
+nonzero camp or construction progress, and keeps invalid actions below ten percent. The
+output includes config, history, checkpoints, action distributions, rejection reasons,
+resource flows, capability outcomes, paired comparisons, and timing.
 
 ## Stage 5.6 Benchmark
 

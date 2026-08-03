@@ -28,13 +28,13 @@ Current implementation status as of 2026-08-03:
 |---|---|---|
 | 7A | Implemented and committed | Handcrafted 48x48 island, ten agents, two days, workbench, campfire, shelter, hunting, cooking, stalkers, Replay 2.1 |
 | 7B | Implemented and committed | Deterministic intent resolution, owned tools, transfers, food lots, spoilage, piles, damage, repair, downing, revival, ledger, Replay 2.2 |
-| 7C trainability slice | Implemented; full run pending | V2 PPO adapter, shared probe reward, outcome evaluator, checkpoint selection, and component profiler |
+| 7C trainability slice | Probe v1 failed; v2 remediation implemented; 250K pilot pending | V2 PPO adapter, versioned shared reward, actor identity, outcome evaluator, checkpoint selection, and component profiler |
 | 7C procedural substrate-7G | Planned | Procedural islands, rescue economy, MARL baselines, frozen benchmark, final viewer |
 
 Stage 7B is released with a canonical Replay 2.2 demonstration that completes revival
-through public actions. Stage 7C now provides the executable trainability gate, but no
-two-million-transition result is claimed until that command is run and its held-out
-outcomes are inspected.
+through public actions. The first Stage 7C run completed 2,000,009 transitions. It proved
+the runtime fast enough but failed the learnability gate, so procedural generation remains
+blocked while the versioned v2 remediation is tested.
 
 ## Brutal Usefulness Verdict
 
@@ -676,35 +676,89 @@ Exit criterion:
 - A large seed sweep is deterministic, reachable, and valid.
 - A five-million-transition run is projected to complete overnight on the M2.
 
-The trainability slice is implemented by
-`examples/run_stage7c_trainability_probe.py`. It leaves the full experiment under explicit
-user control:
+#### Probe v1 Result
+
+`civilization_trainability_probe_v1` is an immutable failed experiment. On fifty evaluation
+seeds over the handcrafted map:
+
+- PPO composite was 0.084 versus 0.404 for legal random.
+- The paired difference was -0.320 with 95 percent interval [-0.356, -0.284].
+- PPO completed no gathering, deposit, workbench, or tool capability under the v1 metric.
+- PPO retained a majority through tick 300 on 42 percent of episodes versus 86 percent for
+  random.
+- The selected checkpoint's invalid-action rate was 76.1 percent versus 3.7 percent for
+  random.
+- Two million transitions ran at about 842 agent transitions per second. The measured
+  five-million-transition projection was 1.65 training hours before evaluation overhead.
+
+The v1 result is not discarded or relabeled. Its local artifacts remain under
+`results/stage7c/ppo_seed0`. The result triggered the predeclared instruction to fix
+observations, rewards, action representation, or difficulty before adding content.
+
+#### Probe v2 Remediation
+
+The remediation makes four bounded changes:
+
+1. `WORK` is masked unless the public structure has reserved materials or the complete
+   reservation is currently available at camp. `REPAIR` receives the equivalent material
+   precondition. Simultaneous competition can still fail symmetrically because no local
+   mask can know the other agents' choices.
+2. The training adapter appends a ten-way one-hot agent identity. It exposes no map,
+   inventory, creature, or remote-agent information; it only lets a shared deterministic
+   policy assign different behavior to otherwise observationally symmetric agents. The
+   public Stage 7B observation and Replay 2.2 contracts remain unchanged. The actor encoder
+   is versioned from 591 to 601 values.
+3. `civilization_trainability_probe_v2` rewards finite gathered units, the first delivery
+   credit for each gathered wood/stone unit, first-time team tile visits, workbench material
+   reservation, applied workbench labor, completion, first production of each tool type,
+   and survival. Delivery credit can never exceed gathered production, so
+   withdraw/redeposit loops cannot create reward. Entropy decays from 0.02 to 0.005 rather
+   than collapsing to 0.001.
+4. Episode artifacts include selected verbs/actions, precondition versus symmetric
+   rejections, gathered/deposited quantities, peak camp stocks, time to gather the
+   workbench bundle, workbench completion time, first-tool time, invalid rate, survival,
+   and every capability predicate.
+
+The v2 capability vector is independent of reward:
+
+- Gather at least six wood and two stone by tick 100.
+- Have at least six wood and two stone simultaneously available at camp by tick 300.
+- Complete the workbench by tick 600.
+- Craft at least one tool by tick 600.
+- Retain at least six active agents at tick 300.
+
+The stricter gathering deadline was calibrated against legal random: in ten fixed-map
+development runs, random gathered the full bundle by tick 100 on two runs, rather than
+saturating the metric on every run by tick 300. The other thresholds and the paired
+composite gate remain unchanged.
+
+Run the v2 250K continuation pilot before another full experiment:
 
 ```bash
 .venv-train/bin/python examples/run_stage7c_trainability_probe.py \
-  --total-agent-transitions 2000000 \
+  --total-agent-transitions 250000 \
   --seed 0 \
-  --output-dir results/stage7c/ppo_seed0
+  --dev-episodes 10 \
+  --test-episodes 20 \
+  --evaluation-milestones 250000 \
+  --output-dir results/stage7c/ppo_probe_v2_250k_seed0
 ```
 
-The runner uses one shared `[128, 128]` feed-forward policy, the v2 flattened action mask,
-and the versioned `civilization_trainability_probe_v1` shared reward. At 250K, 500K, 1M,
-1.5M, and 2M agent transitions it evaluates deterministic inference on ten development
-seeds. It selects the best development checkpoint and compares it with legal-random play
-on fifty separate held-out seeds.
+Continue beyond 250K only if the checkpoint beats random on composite, gathers the timed
+bundle on at least half the evaluation runs, reaches camp-material or later progress at
+least once, and holds invalid actions below ten percent. This is a debugging continuation
+rule, not the final scientific pass criterion.
 
-The gate metrics are independent of training reward: gathering both wood and stone,
-depositing both, completing the workbench, crafting any tool, and retaining at least six
-active agents at tick 300. Passing requires a composite advantage of at least 0.15 over
-seed-matched random with a paired 95 percent bootstrap interval excluding zero, plus the
-predeclared per-capability thresholds. Config, history, checkpoints, detailed episodes,
-comparisons, and timing artifacts are written beneath the selected output directory.
+After the pilot passes, rerun at two million transitions with ten development and fifty
+evaluation seeds. The full gate still requires a composite advantage of at least 0.15 over
+seed-matched random with a paired 95 percent bootstrap interval excluding zero, plus every
+predeclared per-capability threshold.
 
 The implementation profiles actor-observation encoding, mask stacking, actor/value
 inference, environment stepping, PPO updates, v2 observation construction, v2 legal-mask
-generation, entity-slot generation, and conservation-ledger reconciliation. A short smoke
-run validates the workflow but is not evidence of learnability. Procedural generation must
-still wait for the full trainability result.
+generation, entity-slot generation, and conservation-ledger reconciliation. Workflow smoke
+runs are not evidence of learnability. Procedural generation, official island manifests,
+and the centralized MAPPO state still wait for the full trainability result.
 
 ### Stage 7D: Final Economy And Rescue
 

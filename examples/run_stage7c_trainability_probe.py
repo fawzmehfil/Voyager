@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("results/stage7c/ppo_seed0"),
+        default=Path("results/stage7c/ppo_probe_v2_seed0"),
     )
     parser.add_argument("--rollout-world-steps", type=int, default=128)
     parser.add_argument("--minibatch-size", type=int, default=256)
@@ -80,7 +80,7 @@ def main() -> int:
         gae_lambda=0.95,
         clip_ratio=0.2,
         entropy_coef_start=0.02,
-        entropy_coef_end=0.001,
+        entropy_coef_end=0.005,
         value_coef=0.5,
         train_epochs=args.train_epochs,
         minibatch_size=args.minibatch_size,
@@ -130,10 +130,11 @@ def main() -> int:
     pending_milestones = list(milestones)
     evaluations: list[dict[str, Any]] = []
     best_composite = float("-inf")
+    best_invalid_rate = float("inf")
     best_checkpoint: str | None = None
 
     def on_update(stats: PPOUpdateStats) -> None:
-        nonlocal best_composite, best_checkpoint
+        nonlocal best_composite, best_invalid_rate, best_checkpoint
         _append_json_line(history_path, asdict(stats))
         if stats.update == 1 or stats.update % 10 == 0:
             print(
@@ -176,13 +177,22 @@ def main() -> int:
             evaluations.append(evaluation)
             _write_json(output_dir / "development_evaluations.json", evaluations)
             composite = _float_value(learned_summary["composite"], "composite")
-            if composite > best_composite:
+            invalid_rate = _float_value(
+                learned_summary["invalid_action_rate"],
+                "invalid_action_rate",
+            )
+            if composite > best_composite or (
+                composite == best_composite and invalid_rate < best_invalid_rate
+            ):
                 best_composite = composite
+                best_invalid_rate = invalid_rate
                 best_checkpoint = trainer.save_named_checkpoint("best", stats.update)
             print(
                 f"dev composite={composite:.3f} "
                 "difference="
-                f"{_float_value(comparison['composite_difference'], 'difference'):+.3f}"
+                f"{_float_value(comparison['composite_difference'], 'difference'):+.3f} "
+                f"invalid={invalid_rate:.3%} "
+                f"rates={learned_summary['capability_rates']}"
             )
 
     trainer.train(on_update=on_update)
@@ -211,8 +221,14 @@ def main() -> int:
         bootstrap_samples=args.bootstrap_samples,
         seed=args.seed,
     )
+    learned_test_summary = summarize_civilization_results(learned_test)
+    random_test_summary = summarize_civilization_results(random_test)
+    pilot_continuation = _pilot_continuation(
+        learned_test_summary,
+        final_comparison,
+    )
     summary = {
-        "contract": "stage7c_handcrafted_trainability_gate_v1",
+        "contract": "stage7c_handcrafted_trainability_gate_v2",
         "evaluation_inference": (
             "stochastic" if args.stochastic_evaluation else "deterministic"
         ),
@@ -220,16 +236,21 @@ def main() -> int:
         "best_checkpoint_metadata": best_metadata,
         "development_evaluations": evaluations,
         "held_out": {
-            "learned": summarize_civilization_results(learned_test),
-            "random": summarize_civilization_results(random_test),
+            "learned": learned_test_summary,
+            "random": random_test_summary,
             "comparison": final_comparison,
         },
+        "pilot_continuation": pilot_continuation,
         "timing": timing,
     }
     _write_json(output_dir / "summary.json", summary)
     print(
         "Stage 7C gate: "
         + ("PASS" if final_comparison["overall_passed"] else "FAIL")
+    )
+    print(
+        "Continue beyond the 250K pilot: "
+        + ("YES" if pilot_continuation["continue"] else "NO")
     )
     print(f"Artifacts: {output_dir.resolve()}")
     return 0
@@ -251,6 +272,46 @@ def _float_value(value: object, name: str) -> float:
     if not isinstance(value, int | float):
         raise TypeError(f"{name} must be numeric.")
     return float(value)
+
+
+def _pilot_continuation(
+    learned_summary: dict[str, object],
+    comparison: dict[str, object],
+) -> dict[str, object]:
+    rates = learned_summary.get("capability_rates")
+    if not isinstance(rates, dict):
+        raise TypeError("capability_rates must be a dictionary.")
+    checks = {
+        "composite_above_random": _float_value(
+            comparison.get("composite_difference"),
+            "composite_difference",
+        )
+        > 0.0,
+        "gathers_bundle_by_100": _float_value(
+            rates.get("gathered_workbench_bundle_by_100"),
+            "gathered_workbench_bundle_by_100",
+        )
+        >= 0.50,
+        "nonzero_camp_or_later_progress": any(
+            _float_value(rates.get(name), name) > 0.0
+            for name in (
+                "workbench_materials_available_by_300",
+                "workbench_complete",
+                "any_tool_crafted",
+            )
+        ),
+        "invalid_action_rate_below_10_percent": _float_value(
+            learned_summary.get("invalid_action_rate"),
+            "invalid_action_rate",
+        )
+        < 0.10,
+    }
+    return {
+        "contract": "stage7c_probe_v2_250k_continuation_v1",
+        "checks": checks,
+        "continue": all(checks.values()),
+        "note": "A continuation signal is not the full two-million-transition pass gate.",
+    }
 
 
 if __name__ == "__main__":

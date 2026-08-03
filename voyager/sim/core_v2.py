@@ -300,7 +300,15 @@ def _legal(
         return workbench.complete and workbench.condition > 0 and tool not in agent.tools and world._near(agent, workbench.x, workbench.y) and world._has_materials(agent, costs)
     if action.verb == CivilizationV2Verb.WORK:
         structure = state.structures[V2_STRUCTURE_ARGUMENTS[action.argument]]
-        return not structure.complete and world._near(agent, structure.x, structure.y)
+        materials_ready = bool(structure.reserved_materials) or all(
+            state.camp.stockpile.get(item, 0) >= quantity
+            for item, quantity in structure.required_materials.items()
+        )
+        return (
+            not structure.complete
+            and materials_ready
+            and world._near(agent, structure.x, structure.y)
+        )
     if action.verb == CivilizationV2Verb.USE:
         if action.argument == CivilizationV2Argument.SHELTER:
             shelter = state.structures["shelter"]
@@ -335,7 +343,16 @@ def _legal(
         if kind != "structure":
             return False
         structure = state.structures[entity_id]
-        return structure.complete and structure.condition < 100 and world._near(agent, structure.x, structure.y)
+        material_ready = (
+            structure.repair_material_reserved
+            or state.camp.stockpile.get(REPAIR_MATERIAL[entity_id], 0) > 0
+        )
+        return (
+            structure.complete
+            and structure.condition < 100
+            and material_ready
+            and world._near(agent, structure.x, structure.y)
+        )
     if action.verb == CivilizationV2Verb.REVIVE:
         return kind == "agent" and state.agents[entity_id].life_state == "downed" and _adjacent_agent(state, agent, entity_id)
     return False
