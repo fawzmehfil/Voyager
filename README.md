@@ -1,6 +1,10 @@
 # Voyager
 
-Voyager is a Python-first multi-agent reinforcement learning environment for a stranded-island survival economy, paired with a web-based replay/demo layer. The project is inspired by the compact survival benchmark shape of Crafter: a small world, clear environment stepping, achievements, recorded runs, and behavior that can be inspected visually.
+Voyager is an auditable cooperative multi-agent reinforcement-learning benchmark under
+development, built around a bounded stranded-island economy and paired with a web replay
+viewer. Its central experiment is: under the same interaction budget, which RL algorithm
+can most reliably convert finite, spatially distributed resources into population survival
+and rescue on unseen islands?
 
 Stage 5.6 validates three frozen two-million-agent-step TensorFlow PPO policies on 100 held-out seeds each. Across the 300 official deterministic PPO episodes, every run retained 10/10 survivors and completed the shelter. The hierarchical-bootstrap civilization score is 89.42 (95% CI 84.19-93.17). Stage 6 turns those trajectories into a versioned saved-replay platform and a game-like web viewer.
 
@@ -11,11 +15,29 @@ six-person shelter occupancy, and one-or-two seeded night stalkers whose 25-dama
 can be mitigated or suppressed through coordinated defense. The committed Replay 2.1
 vertical slice runs for 600 ticks at two ticks per second.
 
+Stage 7B keeps that same island and shared simulation engine. `VoyagerCivilization-v2`
+adds deterministic intent resolution, targeted local entity slots, five owned tools,
+food-lot provenance and spoilage, ground piles, structure damage and repair, downing and
+revival, and an append-only conservation/contribution ledger. Replay 2.2 records those
+facts without changing the Stage 7A replay or `VoyagerCivilization-v1` contract.
+
 ## Why This Exists
 
-Voyager is an RL environment where agents learn to survive under scarcity. The current environment models agents stranded on an island with food, wood, stone, hunger, energy, shared camp storage, shelter construction, storms, and role specialization. The same runs should also be easy to showcase in a browser, with replay controls, agent panels, event timelines, and metrics.
+Voyager is intended to compare learning methods for decentralized planning, resource
+allocation, public investment, recovery, memory, and cooperative credit assignment. Ten
+agents must acquire a compact production chain, physically redistribute private tools and
+food, build shared infrastructure, survive repeated nights, and maintain a rescue beacon.
+Deterministic simultaneous resolution and an append-only provenance ledger make resource
+flows and claimed cooperation auditable.
 
-Voyager borrows Crafter's compact environment API, achievement-based evaluation, procedural worlds, recorder ergonomics, and benchmark discipline without copying its single-agent crafting game. Voyager's focus remains population-level survival, division of labor, shared infrastructure, resource allocation, and group resilience.
+The planned public benchmark, `VoyagerCollective-v1`, uses a procedural 48x48 island,
+2,400 world ticks across eight day/night cycles, local structured observations, one shared
+reward contract, eighteen outcome achievements, and held-out island seeds. The current
+Stage 7A/7B implementation is a strong deterministic substrate, not yet a validated
+benchmark: Stage 7C-7F must still demonstrate learnability, solvability, cooperation
+dependence, closed-loop control, generalization, algorithm headroom, and practical compute.
+The full design and its failure gates are in
+[`docs/stage_7_civilization_benchmark_plan.md`](docs/stage_7_civilization_benchmark_plan.md).
 
 ## Python API
 
@@ -56,7 +78,7 @@ The multi-agent environment supports seeded reset/step loops, roles, shared map 
 ## Development Stages
 
 - Stage 0: Project skeleton.
-- Stage 1: Single-agent Crafter-style prototype.
+- Stage 1: Single-agent island-survival prototype.
 - Stage 2: Multi-agent environment.
 - Stage 3: Survival economy mechanics.
 - Stage 4: Random, greedy, and cooperative baseline policies.
@@ -64,10 +86,10 @@ The multi-agent environment supports seeded reset/step loops, roles, shared map 
 - Stage 5.5: Action masking, entropy decay, economy/group reward shaping, and three reference training runs. Complete.
 - Stage 5.6: Held-out seeds, achievement success rates, civilization score, benchmark exports, and ablation support. Complete.
 - Stage 6: Versioned recorder, random-access loader, API, curated run library, comparison, presentation mode, and interactive pixel-art viewer. Complete.
-- Stage 7: Real days, shared campfire-to-rescue progression, stronger roles, and procedural scenario families.
-- Stage 8: Recurrent PPO, MAPPO-style centralized critic, and optional pixel/hybrid observations.
-- Stage 9: Research showcase and notable runs.
-- Stage 10: Optional LLM high-level policy layer.
+- Stage 7: Complete `VoyagerCollective-v1`: deterministic cooperative economy, trainability gate, procedural islands, fishing and rescue, PPO/recurrent PPO/MAPPO baselines, frozen evaluation, and final replay presentation.
+- Stage 8: Optional research extensions such as pixels, communication, mixed incentives, variable populations, additional algorithms, or accelerated backends.
+- Stage 9: Public research release, reproducibility package, benchmark tables, report, and polished replay showcase. Voyager may be called complete here.
+- Stage 10: Optional LLM interface only if a concrete later use case justifies it.
 
 ## Backend Setup
 
@@ -161,7 +183,13 @@ python examples/run_benchmark.py \
 
 The environment also exposes `VoyagerReward-v0`, `VoyagerAchievement-v0`, and `VoyagerNoReward-v0`, plus training flags for action-mask, reward-component, and role-observation ablations.
 
-Stage 7 can now add real days and a compact shared progression from campfire through shelter, storage, renewable resources, and a rescue signal or raft without redesigning the replay contract. Longer one-, three-, ten-, and thirty-day tasks will be introduced through curriculum training.
+Stage 7 now targets one fixed eight-cycle, 2,400-tick benchmark rather than a ladder of
+ever-longer campaigns. The compact progression adds one renewable investment, a fishing
+net, and one terminal public project, a rescue beacon. The task should be easy to begin,
+difficult to complete, and calibrated so survival is learnable, majority rescue requires
+the shared economy, and perfect rescue remains exceptional. Feed-forward learning is
+tested before further content is added; recurrent PPO and MAPPO are trained only after
+that gate passes.
 
 ## Stage 6 Replay Platform
 
@@ -244,6 +272,17 @@ voyager-web
 Then open `/replays/civilization_vertical_slice_v1`. The replay remains simulation-free in
 the browser: structures, shelter occupancy, deer, stalkers, night lighting, attacks,
 mitigation, and defeats are all rendered from recorded facts.
+
+Generate and inspect the Stage 7B deterministic-core artifact with:
+
+```bash
+python examples/generate_stage7b_replay.py
+voyager-web
+```
+
+Then open `/replays/civilization_deterministic_core_v1`. Its Replay 2.2 bundle includes a
+separate `ledger.json.gz` artifact and deeply reconstructable state hashes for all 601
+states (initial state plus 600 ticks).
 
 Build and run the single-process production container:
 

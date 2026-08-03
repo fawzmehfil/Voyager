@@ -1,10 +1,16 @@
 # Stage 7A — Civilization Expansion and Handcrafted Vertical Slice
 
+> Historical implementation plan. Stage 7A is complete and remains part of the current
+> project. The official Stage 7 benchmark target is now governed by
+> [Stage 7: Voyager Cooperative Planning Benchmark](stage_7_civilization_benchmark_plan.md).
+> The 600-tick handcrafted slice is a compatibility, development, and replay artifact—not
+> the final 2,400-tick `VoyagerCollective-v1` benchmark.
+
 ## 1. Outcome and Guiding Decisions
 
 Stage 7A expands the existing Voyager island, simulation, RL interfaces, replay system, and
-viewer into the first playable slice of the Civilization campaign. It is not a replacement
-runtime and does not begin a separate project.
+viewer into the first playable slice of the larger cooperative benchmark. It is not a
+replacement runtime and does not begin a separate project.
 
 The guiding rule is:
 
@@ -28,9 +34,10 @@ The completed phase will provide:
   structures, tools, and events.
 - A deterministic five-minute scripted replay: 600 ticks at two ticks per second.
 
-Stage 7A does not produce the official Civilization score, procedural campaign, ecology,
-rescue objective, or learned-policy result. Its purpose is to prove the expanded gameplay
-loop and the compatibility of the existing Voyager stack before later Stage 7 work scales it.
+Stage 7A does not produce the official Voyager Collective score, procedural benchmark
+distribution, rescue objective, or learned-policy result. Its purpose is to prove the
+expanded gameplay loop and the compatibility of the existing Voyager stack before later
+Stage 7 work scales it.
 
 ### Verified starting point
 
@@ -135,9 +142,9 @@ identifiers are:
 stabilized. If registered, it must wrap the same authoritative simulation as the existing
 environments; it is a versioned configuration and interface, not a different game engine.
 
-Only Stage 7A mechanics receive runtime registry entries. Storage, fishing nets, rescue,
-revival, future tools, and other later-phase mechanics remain documented future work rather
-than inactive placeholders permanently occupying the 7A action space.
+Only Stage 7A mechanics receive runtime registry entries. Fishing nets, rescue, revival,
+future tools, and other later-phase mechanics remain documented future work rather than
+inactive placeholders permanently occupying the 7A action space.
 
 ### 3.2 Registries
 
@@ -441,7 +448,7 @@ Stage 7A population achievements are:
 - First stalker defeated.
 - First stalker defeated while defending another agent.
 
-Do not register future rescue, fishing, ecology, storage, revival, or signal achievements as
+Do not register future rescue, fishing, revival, or signal achievements as
 inactive 7A placeholders.
 
 Dense, achievement, and no-reward modes must produce identical world transitions. Named
@@ -633,13 +640,16 @@ Stage 7A is complete only when:
 - The handcrafted map is fixed; procedural 48x48 generation remains Stage 7C.
 - Existing storms remain supported, but Stage 7A does not add new weather systems or
   structure damage.
-- Animal regeneration and ecological sustainability remain Stage 7C.
+- Animal reproduction and a detailed ecology are not part of the official v1 benchmark;
+  they remain optional later extensions.
 - General item transfers, spoilage, damage and repair, downing, and revival remain Stage 7B.
-- Storage, cooking rack, fishing net, rescue signal, final defense, and rescue remain Stage 7D.
-- PPO retraining, curriculum runs, and recurrent policies remain Stage 7E.
+- The fishing net, rescue beacon, fixed final window, and official achievement predicates
+  remain Stage 7D. A separate storage building, cooking rack, and garden are cut from v1.
+- The feed-forward PPO trainability probe begins Stage 7C. Feed-forward PPO, recurrent PPO,
+  and MAPPO calibration remain Stage 7E.
 - Official manifests, benchmark scores, confidence intervals, and benchmark claims remain
   Stage 7F.
-- Final art, campaign analytics, comparative panels, and curated benchmark runs remain Stage
+- Final art, benchmark analytics, comparative panels, and curated benchmark runs remain Stage
   7G.
 - No natural-language agent layer, market, governance, or unrelated platform work is part
   of Stage 7A.
