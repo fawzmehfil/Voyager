@@ -23,10 +23,29 @@ facts without changing the Stage 7A replay or `VoyagerCivilization-v1` contract.
 
 The first Stage 7C trainability probe completed two million transitions and failed: PPO
 learned no production capability and scored below legal-random play. That result is kept as
-`civilization_trainability_probe_v1`. The v2 remediation makes construction masks honest,
-adds a non-privileged agent identity for shared-policy symmetry breaking, uses bounded
-dense progression rewards, and replaces saturated metrics with timed economic outcomes.
-Procedural generation remains gated on a successful trainability result.
+`civilization_trainability_probe_v1`. Its 250K v2 remediation also failed after discovering
+a bounded but dominant stone-mining strategy. V3 caps all gathering and delivery credit at
+the workbench requirements, assigns valid-action credit and conflict penalties per agent,
+adds a nonprivileged camp bearing, and records deterministic plus seeded-stochastic
+evaluation. Procedural generation remains gated on a successful trainability result.
+The v3 250K pilot also failed: sampled PPO learned useful gathering and lower-conflict
+behavior but never delivered stone or began construction, while argmax inference collapsed
+mostly to no-op. Stage 7C therefore uses an isolated learning ladder before any longer run:
+delivery, pre-stocked workbench construction, and first-night survival are trained as
+separate policies over the same v2 mechanics.
+
+The first full learning-ladder run localized the failure: construction passed at 100%
+with workbench completion by tick 5, survival met its deliberately lenient diagnostic bar,
+and delivery remained at 0%. Delivery traces showed gathering without any return to camp.
+The next gate splits delivery into wood acquisition, stone acquisition, and return of
+pre-carried materials before any curriculum or observation change is selected.
+
+The delivery-component run then showed that the primitive capabilities are learnable.
+Sampled PPO raised wood success from random's 25% to 55%, learned a faster directed stone
+policy, and completed return-to-camp on 100% of episodes versus random's 0%. Its remaining
+invalid actions were simultaneous movement collisions. The corrected diagnosis is therefore
+skill composition/team-state failure, not inability to navigate home. These presets remain
+diagnostic tools rather than the official benchmark training distribution.
 
 ## Why This Exists
 
@@ -165,23 +184,36 @@ When a PPO checkpoint is provided, evaluation always prints separate `ppo_determ
 
 `--total-steps` counts agent transitions, not only world ticks. With `10` agents and `128` rollout steps, one PPO update collects up to `1280` training samples. Entropy decays linearly across those agent transitions from `--entropy-coef-start` to `--entropy-coef-end`.
 
-Run the Stage 7C v2 250K remediation pilot first:
+Run the Stage 7C isolated learning ladder after the failed v3 pilot:
 
 ```bash
-.venv-train/bin/python examples/run_stage7c_trainability_probe.py \
-  --total-agent-transitions 250000 \
+.venv-train/bin/python examples/run_stage7c_learning_ladder.py \
+  --tasks all \
   --seed 0 \
-  --dev-episodes 10 \
-  --test-episodes 20 \
-  --evaluation-milestones 250000 \
-  --output-dir results/stage7c/ppo_probe_v2_250k_seed0
+  --eval-episodes 20 \
+  --delivery-transitions 100000 \
+  --construction-transitions 50000 \
+  --survival-transitions 100000 \
+  --output-dir results/stage7c/learning_ladder_v1_seed0
 ```
 
-This pilot is a continuation decision, not the full pass gate. Continue to two million
-transitions only if PPO exceeds random, gathers the workbench bundle promptly, produces
-nonzero camp or construction progress, and keeps invalid actions below ten percent. The
-output includes config, history, checkpoints, action distributions, rejection reasons,
-resource flows, capability outcomes, paired comparisons, and timing.
+This is a diagnostic, not an official benchmark score. Each task trains a fresh policy,
+compares seeded-stochastic behavior with legal random, records deterministic behavior as a
+secondary diagnostic, and emits the first likely failure class. Do not resume the full
+probe or procedural generation until these isolated tests locate the bottleneck.
+
+Run the focused delivery components without repeating construction and survival:
+
+```bash
+.venv-train/bin/python examples/run_stage7c_learning_ladder.py \
+  --tasks delivery_diagnostics \
+  --seed 0 \
+  --eval-episodes 20 \
+  --gather-wood-transitions 75000 \
+  --gather-stone-transitions 75000 \
+  --return-to-camp-transitions 75000 \
+  --output-dir results/stage7c/delivery_components_v1_seed0
+```
 
 ## Stage 5.6 Benchmark
 

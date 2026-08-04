@@ -13,6 +13,7 @@ from voyager.training.checkpoints import load_policy_checkpoint
 from voyager.training.civilization_evaluation import (
     compare_against_random,
     evaluate_civilization_policy,
+    pilot_continuation,
     summarize_civilization_results,
 )
 from voyager.training.environments import (
@@ -31,7 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("results/stage7c/ppo_probe_v2_seed0"),
+        default=Path("results/stage7c/ppo_probe_v3_seed0"),
     )
     parser.add_argument("--rollout-world-steps", type=int, default=128)
     parser.add_argument("--minibatch-size", type=int, default=256)
@@ -51,7 +52,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--stochastic-evaluation",
         action="store_true",
-        help="Evaluate sampled actions; deterministic inference is the default contract.",
+        help="Deprecated: v3 always records deterministic and seeded-stochastic inference.",
     )
     return parser.parse_args()
 
@@ -152,16 +153,32 @@ def main() -> int:
                 f"Evaluating milestone {milestone:,} "
                 f"(actual transitions {stats.agent_steps:,})..."
             )
-            learned_dev = evaluate_civilization_policy(
+            learned_deterministic = evaluate_civilization_policy(
                 policy_name="feed_forward_ppo",
                 policy="model",
                 seeds=dev_seeds,
                 model=trainer.model,
-                deterministic=not args.stochastic_evaluation,
+                deterministic=True,
             )
-            learned_summary = summarize_civilization_results(learned_dev)
-            comparison = compare_against_random(
-                learned_dev,
+            learned_stochastic = evaluate_civilization_policy(
+                policy_name="feed_forward_ppo_seeded_stochastic",
+                policy="model",
+                seeds=dev_seeds,
+                model=trainer.model,
+                deterministic=False,
+            )
+            deterministic_summary = summarize_civilization_results(
+                learned_deterministic
+            )
+            stochastic_summary = summarize_civilization_results(learned_stochastic)
+            deterministic_comparison = compare_against_random(
+                learned_deterministic,
+                random_dev,
+                bootstrap_samples=args.bootstrap_samples,
+                seed=args.seed,
+            )
+            stochastic_comparison = compare_against_random(
+                learned_stochastic,
                 random_dev,
                 bootstrap_samples=args.bootstrap_samples,
                 seed=args.seed,
@@ -170,15 +187,23 @@ def main() -> int:
                 "milestone_agent_transitions": milestone,
                 "actual_agent_transitions": stats.agent_steps,
                 "checkpoint": checkpoint,
-                "learned": learned_summary,
+                "learned": {
+                    "deterministic": deterministic_summary,
+                    "seeded_stochastic": stochastic_summary,
+                },
                 "random": random_dev_summary,
-                "comparison": comparison,
+                "comparison": {
+                    "deterministic": deterministic_comparison,
+                    "seeded_stochastic": stochastic_comparison,
+                },
             }
             evaluations.append(evaluation)
             _write_json(output_dir / "development_evaluations.json", evaluations)
-            composite = _float_value(learned_summary["composite"], "composite")
+            composite = _float_value(
+                deterministic_summary["composite"], "composite"
+            )
             invalid_rate = _float_value(
-                learned_summary["invalid_action_rate"],
+                deterministic_summary["invalid_action_rate"],
                 "invalid_action_rate",
             )
             if composite > best_composite or (
@@ -190,9 +215,17 @@ def main() -> int:
             print(
                 f"dev composite={composite:.3f} "
                 "difference="
-                f"{_float_value(comparison['composite_difference'], 'difference'):+.3f} "
+                f"{_float_value(deterministic_comparison['composite_difference'], 'difference'):+.3f} "
                 f"invalid={invalid_rate:.3%} "
-                f"rates={learned_summary['capability_rates']}"
+                f"rates={deterministic_summary['capability_rates']}"
+            )
+            print(
+                "seeded-stochastic "
+                f"composite={_float_value(stochastic_summary['composite'], 'composite'):.3f} "
+                "difference="
+                f"{_float_value(stochastic_comparison['composite_difference'], 'difference'):+.3f} "
+                "invalid="
+                f"{_float_value(stochastic_summary['invalid_action_rate'], 'invalid_action_rate'):.3%}"
             )
 
     trainer.train(on_update=on_update)
@@ -203,54 +236,77 @@ def main() -> int:
 
     print(f"Evaluating best checkpoint on {len(test_seeds)} held-out seeds...")
     best_model, best_metadata = load_policy_checkpoint(best_checkpoint)
-    learned_test = evaluate_civilization_policy(
+    learned_test_deterministic = evaluate_civilization_policy(
         policy_name="feed_forward_ppo",
         policy="model",
         seeds=test_seeds,
         model=best_model,
-        deterministic=not args.stochastic_evaluation,
+        deterministic=True,
+    )
+    learned_test_stochastic = evaluate_civilization_policy(
+        policy_name="feed_forward_ppo_seeded_stochastic",
+        policy="model",
+        seeds=test_seeds,
+        model=best_model,
+        deterministic=False,
     )
     random_test = evaluate_civilization_policy(
         policy_name="legal_random",
         policy="legal_random",
         seeds=test_seeds,
     )
-    final_comparison = compare_against_random(
-        learned_test,
+    deterministic_comparison = compare_against_random(
+        learned_test_deterministic,
         random_test,
         bootstrap_samples=args.bootstrap_samples,
         seed=args.seed,
     )
-    learned_test_summary = summarize_civilization_results(learned_test)
+    stochastic_comparison = compare_against_random(
+        learned_test_stochastic,
+        random_test,
+        bootstrap_samples=args.bootstrap_samples,
+        seed=args.seed,
+    )
+    deterministic_summary = summarize_civilization_results(
+        learned_test_deterministic
+    )
+    stochastic_summary = summarize_civilization_results(learned_test_stochastic)
     random_test_summary = summarize_civilization_results(random_test)
-    pilot_continuation = _pilot_continuation(
-        learned_test_summary,
-        final_comparison,
+    continuation = pilot_continuation(
+        deterministic_summary,
+        deterministic_comparison,
+        stochastic_summary,
+        stochastic_comparison,
     )
     summary = {
-        "contract": "stage7c_handcrafted_trainability_gate_v2",
-        "evaluation_inference": (
-            "stochastic" if args.stochastic_evaluation else "deterministic"
-        ),
+        "contract": "stage7c_handcrafted_trainability_gate_v3",
+        "evaluation_inference": ["deterministic", "seeded_stochastic"],
+        "primary_inference": "deterministic",
         "best_checkpoint": best_checkpoint,
         "best_checkpoint_metadata": best_metadata,
         "development_evaluations": evaluations,
         "held_out": {
-            "learned": learned_test_summary,
+            "learned": {
+                "deterministic": deterministic_summary,
+                "seeded_stochastic": stochastic_summary,
+            },
             "random": random_test_summary,
-            "comparison": final_comparison,
+            "comparison": {
+                "deterministic": deterministic_comparison,
+                "seeded_stochastic": stochastic_comparison,
+            },
         },
-        "pilot_continuation": pilot_continuation,
+        "pilot_continuation": continuation,
         "timing": timing,
     }
     _write_json(output_dir / "summary.json", summary)
     print(
         "Stage 7C gate: "
-        + ("PASS" if final_comparison["overall_passed"] else "FAIL")
+        + ("PASS" if deterministic_comparison["overall_passed"] else "FAIL")
     )
     print(
         "Continue beyond the 250K pilot: "
-        + ("YES" if pilot_continuation["continue"] else "NO")
+        + ("YES" if continuation["continue"] else "NO")
     )
     print(f"Artifacts: {output_dir.resolve()}")
     return 0
@@ -272,46 +328,6 @@ def _float_value(value: object, name: str) -> float:
     if not isinstance(value, int | float):
         raise TypeError(f"{name} must be numeric.")
     return float(value)
-
-
-def _pilot_continuation(
-    learned_summary: dict[str, object],
-    comparison: dict[str, object],
-) -> dict[str, object]:
-    rates = learned_summary.get("capability_rates")
-    if not isinstance(rates, dict):
-        raise TypeError("capability_rates must be a dictionary.")
-    checks = {
-        "composite_above_random": _float_value(
-            comparison.get("composite_difference"),
-            "composite_difference",
-        )
-        > 0.0,
-        "gathers_bundle_by_100": _float_value(
-            rates.get("gathered_workbench_bundle_by_100"),
-            "gathered_workbench_bundle_by_100",
-        )
-        >= 0.50,
-        "nonzero_camp_or_later_progress": any(
-            _float_value(rates.get(name), name) > 0.0
-            for name in (
-                "workbench_materials_available_by_300",
-                "workbench_complete",
-                "any_tool_crafted",
-            )
-        ),
-        "invalid_action_rate_below_10_percent": _float_value(
-            learned_summary.get("invalid_action_rate"),
-            "invalid_action_rate",
-        )
-        < 0.10,
-    }
-    return {
-        "contract": "stage7c_probe_v2_250k_continuation_v1",
-        "checks": checks,
-        "continue": all(checks.values()),
-        "note": "A continuation signal is not the full two-million-transition pass gate.",
-    }
 
 
 if __name__ == "__main__":

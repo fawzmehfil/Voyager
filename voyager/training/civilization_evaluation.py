@@ -72,6 +72,14 @@ class CivilizationEpisodeResult:
     rejection_reasons: dict[str, int] = field(default_factory=dict)
     selected_verbs: dict[str, int] = field(default_factory=dict)
     selected_actions: dict[str, int] = field(default_factory=dict)
+    total_agent_return: float = 0.0
+    mean_agent_return: float = 0.0
+    per_agent_returns: dict[str, float] = field(default_factory=dict)
+    shared_reward_component_totals: dict[str, float] = field(default_factory=dict)
+    individual_reward_component_totals: dict[str, float] = field(default_factory=dict)
+    per_agent_individual_reward_totals: dict[str, dict[str, float]] = field(
+        default_factory=dict
+    )
 
     @property
     def composite(self) -> float:
@@ -116,6 +124,15 @@ def run_civilization_episode(
     rng = np.random.default_rng(seed)
     observations, infos = env.reset(seed=seed)
     shared_return = 0.0
+    total_agent_return = 0.0
+    per_agent_returns: dict[str, float] = {
+        agent_id: 0.0 for agent_id in env.possible_agents
+    }
+    shared_reward_component_totals: Counter[str] = Counter()
+    individual_reward_component_totals: Counter[str] = Counter()
+    per_agent_individual_reward_totals: dict[str, Counter[str]] = {
+        agent_id: Counter() for agent_id in env.possible_agents
+    }
     agent_transitions = 0
     invalid_actions = 0
     submitted_actions = 0
@@ -187,7 +204,37 @@ def run_civilization_episode(
             for agent_id in agent_ids
         )
         if rewards:
-            shared_return += float(next(iter(rewards.values())))
+            first_info = infos[agent_ids[0]]
+            shared_return += float(
+                first_info.get("shared_reward", next(iter(rewards.values())))
+            )
+            total_agent_return += sum(float(value) for value in rewards.values())
+            for agent_id, value in rewards.items():
+                per_agent_returns[agent_id] = (
+                    per_agent_returns.get(agent_id, 0.0) + float(value)
+                )
+            shared_components = first_info.get("shared_reward_components", {})
+            if isinstance(shared_components, dict):
+                shared_reward_component_totals.update(
+                    {
+                        str(name): float(value)
+                        for name, value in shared_components.items()
+                    }
+                )
+            for agent_id in agent_ids:
+                individual_components = infos[agent_id].get(
+                    "individual_reward_components", {}
+                )
+                if not isinstance(individual_components, dict):
+                    continue
+                normalized_components = {
+                    str(name): float(value)
+                    for name, value in individual_components.items()
+                }
+                individual_reward_component_totals.update(normalized_components)
+                per_agent_individual_reward_totals[agent_id].update(
+                    normalized_components
+                )
         state = env.world.state
         assert state is not None
         new_ledger = state.ledger[ledger_cursor:]
@@ -273,6 +320,22 @@ def run_civilization_episode(
         rejection_reasons=dict(sorted(rejection_reasons.items())),
         selected_verbs=dict(sorted(selected_verbs.items())),
         selected_actions=dict(sorted(selected_actions.items())),
+        total_agent_return=total_agent_return,
+        mean_agent_return=total_agent_return / len(env.possible_agents),
+        per_agent_returns={
+            agent_id: float(per_agent_returns[agent_id])
+            for agent_id in env.possible_agents
+        },
+        shared_reward_component_totals=dict(
+            sorted(shared_reward_component_totals.items())
+        ),
+        individual_reward_component_totals=dict(
+            sorted(individual_reward_component_totals.items())
+        ),
+        per_agent_individual_reward_totals={
+            agent_id: dict(sorted(values.items()))
+            for agent_id, values in sorted(per_agent_individual_reward_totals.items())
+        },
     )
     env.close()
     return result
@@ -350,6 +413,18 @@ def summarize_civilization_results(
         "mean_shared_return": float(
             np.mean([result.shared_return for result in results])
         ),
+        "mean_total_agent_return": float(
+            np.mean([result.total_agent_return for result in results])
+        ),
+        "mean_agent_return": float(
+            np.mean([result.mean_agent_return for result in results])
+        ),
+        "mean_shared_reward_components": _mean_numeric_maps(
+            [result.shared_reward_component_totals for result in results]
+        ),
+        "mean_individual_reward_components": _mean_numeric_maps(
+            [result.individual_reward_component_totals for result in results]
+        ),
         "episodes_detail": [result.as_dict() for result in results],
     }
 
@@ -404,6 +479,76 @@ def compare_against_random(
     }
 
 
+def pilot_continuation(
+    deterministic_summary: dict[str, object],
+    deterministic_comparison: dict[str, object],
+    stochastic_summary: dict[str, object],
+    stochastic_comparison: dict[str, object],
+) -> dict[str, object]:
+    """Apply the deterministic-primary 250K continuation contract."""
+
+    deterministic = _continuation_checks(
+        deterministic_summary,
+        deterministic_comparison,
+    )
+    stochastic = _continuation_checks(
+        stochastic_summary,
+        stochastic_comparison,
+    )
+    deterministic_continue = all(deterministic.values())
+    stochastic_continue = all(stochastic.values())
+    return {
+        "contract": "stage7c_probe_v3_250k_continuation_v1",
+        "primary_inference": "deterministic",
+        "checks": deterministic,
+        "continue": deterministic_continue,
+        "seeded_stochastic_diagnostic": {
+            "checks": stochastic,
+            "would_continue": stochastic_continue,
+        },
+        "failure_mode": (
+            "deterministic_coordination_collapse"
+            if stochastic_continue and not deterministic_continue
+            else None
+        ),
+        "note": "Seeded stochastic inference is diagnostic and cannot authorize continuation.",
+    }
+
+
+def _continuation_checks(
+    learned_summary: dict[str, object],
+    comparison: dict[str, object],
+) -> dict[str, bool]:
+    rates = learned_summary.get("capability_rates")
+    if not isinstance(rates, dict):
+        raise TypeError("capability_rates must be a dictionary.")
+    return {
+        "composite_above_random": _float_value(
+            comparison.get("composite_difference"),
+            "composite_difference",
+        )
+        > 0.0,
+        "gathers_bundle_by_100": _float_value(
+            rates.get("gathered_workbench_bundle_by_100"),
+            "gathered_workbench_bundle_by_100",
+        )
+        >= 0.50,
+        "nonzero_camp_or_later_progress": any(
+            _float_value(rates.get(name), name) > 0.0
+            for name in (
+                "workbench_materials_available_by_300",
+                "workbench_complete",
+                "any_tool_crafted",
+            )
+        ),
+        "invalid_action_rate_below_10_percent": _float_value(
+            learned_summary.get("invalid_action_rate"),
+            "invalid_action_rate",
+        )
+        < 0.10,
+    }
+
+
 def _sum_counters(rows: Any) -> Counter[str]:
     result: Counter[str] = Counter()
     for row in rows:
@@ -416,10 +561,24 @@ def _mean_counters(rows: list[dict[str, int]]) -> dict[str, float]:
     return {key: value / len(rows) for key, value in sorted(totals.items())}
 
 
+def _mean_numeric_maps(rows: list[dict[str, float]]) -> dict[str, float]:
+    keys = {key for row in rows for key in row}
+    return {
+        key: float(np.mean([row.get(key, 0.0) for row in rows]))
+        for key in sorted(keys)
+    }
+
+
 def _integer(value: object, name: str) -> int:
     if not isinstance(value, int):
         raise TypeError(f"{name} must be an integer.")
     return value
+
+
+def _float_value(value: object, name: str) -> float:
+    if not isinstance(value, int | float):
+        raise TypeError(f"{name} must be numeric.")
+    return float(value)
 
 
 def _probabilities(logits: np.ndarray) -> np.ndarray:

@@ -1,4 +1,4 @@
-"""Versioned shared rewards and actor observations for Stage 7C trainability."""
+"""Versioned rewards and actor observations for Stage 7C trainability."""
 
 from __future__ import annotations
 
@@ -15,14 +15,19 @@ from voyager.envs.civilization_v2 import (
 )
 
 PROBE_REWARD_V1 = "civilization_trainability_probe_v1"
-PROBE_REWARD_VERSION = "civilization_trainability_probe_v2"
-PROBE_REWARD_VERSIONS = frozenset({PROBE_REWARD_V1, PROBE_REWARD_VERSION})
+PROBE_REWARD_V2 = "civilization_trainability_probe_v2"
+PROBE_REWARD_VERSION = "civilization_trainability_probe_v3"
+PROBE_REWARD_VERSIONS = frozenset(
+    {PROBE_REWARD_V1, PROBE_REWARD_V2, PROBE_REWARD_VERSION}
+)
+
+WORKBENCH_RESOURCE_REQUIREMENTS = {"wood": 6, "stone": 2}
 
 
 class CivilizationProbeRewardWrapper(
     ParallelEnv[str, dict[str, np.ndarray], int]
 ):
-    """Expose a versioned shared probe reward over the deterministic v2 world."""
+    """Expose versioned probe rewards over the deterministic v2 world."""
 
     metadata = CivilizationV2FlattenedActionWrapper.metadata
 
@@ -41,9 +46,12 @@ class CivilizationProbeRewardWrapper(
         self.possible_agents = list(self.env.possible_agents)
         self.agents = list(self.env.agents)
         self.observation_spaces = dict(self.env.observation_spaces)
-        if reward_version == PROBE_REWARD_VERSION:
+        if reward_version in {PROBE_REWARD_V2, PROBE_REWARD_VERSION}:
             self.observation_spaces = {
-                agent_id: self._identity_observation_space(space)
+                agent_id: self._augmented_observation_space(
+                    space,
+                    include_camp_bearing=reward_version == PROBE_REWARD_VERSION,
+                )
                 for agent_id, space in self.observation_spaces.items()
             }
         self.action_spaces = dict(self.env.action_spaces)
@@ -52,6 +60,8 @@ class CivilizationProbeRewardWrapper(
         self._gathered_units: Counter[str] = Counter()
         self._credited_deposits: Counter[str] = Counter()
         self._visited_positions: set[tuple[int, int]] = set()
+        self._v3_gather_credit: dict[str, float] = {}
+        self._v3_camp_high_water: dict[str, float] = {}
 
     @property
     def world(self) -> Any:
@@ -71,6 +81,14 @@ class CivilizationProbeRewardWrapper(
         self._milestones.clear()
         self._gathered_units.clear()
         self._credited_deposits.clear()
+        self._v3_gather_credit.clear()
+        self._v3_camp_high_water.clear()
+        self._v3_gather_credit.update(
+            {item: 0.0 for item in WORKBENCH_RESOURCE_REQUIREMENTS}
+        )
+        self._v3_camp_high_water.update(
+            {item: 0.0 for item in WORKBENCH_RESOURCE_REQUIREMENTS}
+        )
         state = self.world.state
         assert state is not None
         self._ledger_cursor = len(state.ledger)
@@ -103,20 +121,52 @@ class CivilizationProbeRewardWrapper(
         assert state is not None
         new_ledger = state.ledger[self._ledger_cursor :]
         self._ledger_cursor = len(state.ledger)
-        components = self._reward_components(
-            new_ledger=new_ledger,
-            before_workbench=before_workbench,
-            infos=infos,
-        )
-        team_reward = float(sum(components.values()))
-        rewards = {agent_id: team_reward for agent_id in acting_agents}
-        for agent_id in acting_agents:
-            info = infos[agent_id]
-            info["environment_reward_components"] = dict(
-                info.get("dense_reward_components", {})
+        if self.reward_version == PROBE_REWARD_VERSION:
+            shared_components, individual_components = self._reward_components_v3(
+                new_ledger=new_ledger,
+                before_workbench=before_workbench,
+                infos=infos,
             )
-            info["reward_components"] = dict(components)
-            info["reward_version"] = self.reward_version
+            shared_reward = float(sum(shared_components.values()))
+            rewards = {}
+            for agent_id in acting_agents:
+                individual = individual_components.get(agent_id, {})
+                individual_reward = float(sum(individual.values()))
+                rewards[agent_id] = shared_reward + individual_reward
+                info = infos[agent_id]
+                info["environment_reward_components"] = dict(
+                    info.get("dense_reward_components", {})
+                )
+                info["shared_reward_components"] = dict(shared_components)
+                info["individual_reward_components"] = dict(individual)
+                info["reward_components"] = {
+                    **{
+                        f"shared_{name}": value
+                        for name, value in shared_components.items()
+                    },
+                    **{
+                        f"individual_{name}": value
+                        for name, value in individual.items()
+                    },
+                }
+                info["shared_reward"] = shared_reward
+                info["individual_reward"] = individual_reward
+                info["reward_version"] = self.reward_version
+        else:
+            components = self._reward_components(
+                new_ledger=new_ledger,
+                before_workbench=before_workbench,
+                infos=infos,
+            )
+            team_reward = float(sum(components.values()))
+            rewards = {agent_id: team_reward for agent_id in acting_agents}
+            for agent_id in acting_agents:
+                info = infos[agent_id]
+                info["environment_reward_components"] = dict(
+                    info.get("dense_reward_components", {})
+                )
+                info["reward_components"] = dict(components)
+                info["reward_version"] = self.reward_version
         return (
             self._augment_observations(observations),
             rewards,
@@ -150,6 +200,8 @@ class CivilizationProbeRewardWrapper(
                 before_workbench=before_workbench,
                 infos=infos,
             )
+        if self.reward_version != PROBE_REWARD_V2:
+            raise RuntimeError("The v3 reward uses per-agent reward components.")
         return self._reward_components_v2(
             new_ledger=new_ledger,
             before_workbench=before_workbench,
@@ -241,6 +293,98 @@ class CivilizationProbeRewardWrapper(
             self._award_once(components, "first_night_survival", active_fraction)
         return components
 
+    def _reward_components_v3(
+        self,
+        *,
+        new_ledger: list[dict[str, object]],
+        before_workbench: float,
+        infos: dict[str, dict[str, Any]],
+    ) -> tuple[dict[str, float], dict[str, dict[str, float]]]:
+        state = self.world.state
+        assert state is not None
+        active_fraction = sum(
+            agent.life_state == "active" for agent in state.agents.values()
+        ) / len(state.agents)
+        shared: dict[str, float] = {
+            "survival": 0.001 * active_fraction,
+            "downed": -0.25
+            * sum(event["type"] == "agent_downed" for event in state.events),
+            "death": -1.0
+            * sum(event["type"] == "agent_died" for event in state.events),
+        }
+        individual: dict[str, dict[str, float]] = {
+            agent_id: {} for agent_id in infos
+        }
+        for agent_id, info in infos.items():
+            if bool(info.get("invalid_action", False)):
+                individual[agent_id]["invalid"] = -0.02
+
+        gathered = self._actor_quantities(new_ledger, event="gather")
+        deposited = self._actor_quantities(new_ledger, event="deposit")
+        for item, requirement in WORKBENCH_RESOURCE_REQUIREMENTS.items():
+            gathered_by_actor = gathered.get(item, {})
+            gathered_total = sum(gathered_by_actor.values())
+            remaining = max(0.0, requirement - self._v3_gather_credit[item])
+            gather_credit = min(gathered_total, remaining)
+            if gather_credit > 0.0:
+                self._distribute_credit(
+                    individual,
+                    gathered_by_actor,
+                    gather_credit,
+                    component=f"gather_{item}",
+                    value_per_unit=0.05,
+                )
+                self._v3_gather_credit[item] += gather_credit
+            if self._v3_gather_credit[item] >= requirement:
+                self._award_once(shared, f"gather_{item}_requirement", 0.25)
+
+            previous_high_water = self._v3_camp_high_water[item]
+            current_stock = min(requirement, state.camp.stockpile.get(item, 0))
+            current_high_water = max(previous_high_water, current_stock)
+            delivery_credit = current_high_water - previous_high_water
+            if delivery_credit > 0.0:
+                self._distribute_credit(
+                    individual,
+                    deposited.get(item, {}),
+                    delivery_credit,
+                    component=f"deliver_{item}",
+                    value_per_unit=0.10,
+                )
+                self._v3_camp_high_water[item] = current_high_water
+            if self._v3_camp_high_water[item] >= requirement:
+                self._award_once(shared, f"camp_{item}_requirement", 0.50)
+
+        if all(
+            self._v3_gather_credit[item] >= requirement
+            for item, requirement in WORKBENCH_RESOURCE_REQUIREMENTS.items()
+        ):
+            self._award_once(shared, "gather_workbench_bundle", 0.50)
+        if all(
+            self._v3_camp_high_water[item] >= requirement
+            for item, requirement in WORKBENCH_RESOURCE_REQUIREMENTS.items()
+        ):
+            self._award_once(shared, "camp_workbench_bundle", 1.00)
+
+        for entry in new_ledger:
+            event = str(entry.get("event", ""))
+            target = str(entry.get("target", ""))
+            tool = str(entry.get("tool", ""))
+            if event == "construction_reserve" and target == "workbench":
+                self._award_once(shared, "workbench_materials_reserved", 1.00)
+            elif event == "craft_tool" and tool:
+                self._award_once(shared, "first_tool_crafted", 0.75)
+                self._award_once(shared, f"first_{tool}_crafted", 0.25)
+
+        workbench_progress = state.structures["workbench"].progress
+        progress_delta = max(0.0, workbench_progress - before_workbench)
+        if progress_delta:
+            shared["workbench_progress"] = 2.0 * progress_delta
+        if before_workbench < 1.0 <= workbench_progress:
+            self._award_once(shared, "workbench_complete", 2.00)
+        if state.step_count == 300:
+            self._award_once(shared, "first_night_survival", active_fraction)
+        return shared, individual
+
     def _reward_components_v1(
         self,
         *,
@@ -295,26 +439,106 @@ class CivilizationProbeRewardWrapper(
         for agent_id, observation in observations.items():
             identity = np.zeros(len(self.possible_agents), dtype=np.int8)
             identity[self.possible_agents.index(agent_id)] = 1
-            augmented[agent_id] = {
+            values = {
                 **observation,
                 "agent_identity": identity,
             }
+            if self.reward_version == PROBE_REWARD_VERSION:
+                state = self.world.state
+                assert state is not None
+                agent = state.agents[agent_id]
+                x_scale = max(1, state.terrain.shape[1] - 1)
+                y_scale = max(1, state.terrain.shape[0] - 1)
+                values["camp_bearing"] = np.array(
+                    [
+                        (state.camp.x - agent.x) / x_scale,
+                        (state.camp.y - agent.y) / y_scale,
+                        (
+                            abs(state.camp.x - agent.x)
+                            + abs(state.camp.y - agent.y)
+                        )
+                        / (x_scale + y_scale),
+                    ],
+                    dtype=np.float32,
+                )
+            augmented[agent_id] = values
         return augmented
 
-    def _identity_observation_space(self, space: spaces.Space) -> spaces.Dict:
+    def _augmented_observation_space(
+        self,
+        space: spaces.Space,
+        *,
+        include_camp_bearing: bool,
+    ) -> spaces.Dict:
         if not isinstance(space, spaces.Dict):
             raise TypeError("Civilization v2 requires a Dict observation space.")
+        additions: dict[str, spaces.Space] = {
+            "agent_identity": spaces.Box(
+                0,
+                1,
+                shape=(len(self.possible_agents),),
+                dtype=np.int8,
+            )
+        }
+        if include_camp_bearing:
+            additions["camp_bearing"] = spaces.Box(
+                low=np.array([-1.0, -1.0, 0.0], dtype=np.float32),
+                high=np.ones(3, dtype=np.float32),
+                dtype=np.float32,
+            )
         return spaces.Dict(
             {
                 **space.spaces,
-                "agent_identity": spaces.Box(
-                    0,
-                    1,
-                    shape=(len(self.possible_agents),),
-                    dtype=np.int8,
-                ),
+                **additions,
             }
         )
+
+    @staticmethod
+    def _actor_quantities(
+        entries: list[dict[str, object]],
+        *,
+        event: str,
+    ) -> dict[str, dict[str, float]]:
+        result: dict[str, dict[str, float]] = {}
+        for entry in entries:
+            if str(entry.get("event", "")) != event:
+                continue
+            item = str(entry.get("item", ""))
+            quantity = CivilizationProbeRewardWrapper._integer(
+                entry.get("quantity", 0),
+                "ledger quantity",
+            )
+            actors = entry.get("actors", [])
+            if not isinstance(actors, list) or not actors or quantity <= 0:
+                continue
+            actor_quantity = quantity / len(actors)
+            item_result = result.setdefault(item, {})
+            for actor in actors:
+                actor_id = str(actor)
+                item_result[actor_id] = (
+                    item_result.get(actor_id, 0.0) + actor_quantity
+                )
+        return result
+
+    @staticmethod
+    def _distribute_credit(
+        components: dict[str, dict[str, float]],
+        actor_quantities: dict[str, float],
+        credited_quantity: float,
+        *,
+        component: str,
+        value_per_unit: float,
+    ) -> None:
+        total_quantity = sum(actor_quantities.values())
+        if credited_quantity <= 0.0 or total_quantity <= 0.0:
+            return
+        for agent_id, quantity in actor_quantities.items():
+            if agent_id not in components:
+                continue
+            value = value_per_unit * credited_quantity * quantity / total_quantity
+            components[agent_id][component] = (
+                components[agent_id].get(component, 0.0) + value
+            )
 
     @staticmethod
     def _add_component(

@@ -12,6 +12,9 @@ Observation = Mapping[str, np.ndarray]
 COMPACT_OBSERVATION_ENCODER = "compact_structured_210_v1"
 CIVILIZATION_V2_OBSERVATION_ENCODER = "civilization_v2_flat_v1"
 CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER = "civilization_v2_identity_flat_v2"
+CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER = (
+    "civilization_v3_navigation_flat_v3"
+)
 
 OBSERVATION_KEYS = ("local_view", "stats", "inventory", "role", "camp", "progress")
 CIVILIZATION_V2_OBSERVATION_KEYS = (
@@ -30,6 +33,10 @@ CIVILIZATION_V2_IDENTITY_OBSERVATION_KEYS = (
     *CIVILIZATION_V2_OBSERVATION_KEYS,
     "agent_identity",
 )
+CIVILIZATION_V3_NAVIGATION_OBSERVATION_KEYS = (
+    *CIVILIZATION_V2_IDENTITY_OBSERVATION_KEYS,
+    "camp_bearing",
+)
 
 
 def flatten_observation(
@@ -41,12 +48,13 @@ def flatten_observation(
     if encoder_id in {
         CIVILIZATION_V2_OBSERVATION_ENCODER,
         CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER,
+        CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER,
     }:
-        keys = (
-            CIVILIZATION_V2_IDENTITY_OBSERVATION_KEYS
-            if encoder_id == CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER
-            else CIVILIZATION_V2_OBSERVATION_KEYS
-        )
+        keys: tuple[str, ...] = CIVILIZATION_V2_OBSERVATION_KEYS
+        if encoder_id == CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER:
+            keys = CIVILIZATION_V2_IDENTITY_OBSERVATION_KEYS
+        elif encoder_id == CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER:
+            keys = CIVILIZATION_V3_NAVIGATION_OBSERVATION_KEYS
         return _flatten_civilization_v2_observation(observation, keys)
     if encoder_id != COMPACT_OBSERVATION_ENCODER:
         raise ValueError(f"Unknown observation encoder: {encoder_id!r}.")
@@ -90,10 +98,13 @@ def flat_observation_size(
         keys = CIVILIZATION_V2_OBSERVATION_KEYS
     elif encoder_id == CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER:
         keys = CIVILIZATION_V2_IDENTITY_OBSERVATION_KEYS
+    elif encoder_id == CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER:
+        keys = CIVILIZATION_V3_NAVIGATION_OBSERVATION_KEYS
     if encoder_id not in {
         COMPACT_OBSERVATION_ENCODER,
         CIVILIZATION_V2_OBSERVATION_ENCODER,
         CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER,
+        CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER,
     }:
         raise ValueError(f"Unknown observation encoder: {encoder_id!r}.")
     size = 0
@@ -138,7 +149,7 @@ def _flatten_civilization_v2_observation(
     parts = [np.clip(normalized_tiles, 0.0, 1.0).reshape(-1)]
     for key in keys[1:]:
         values = np.asarray(observation[key], dtype=np.float32)
-        if key == "entity_slots":
+        if key in {"entity_slots", "camp_bearing"}:
             values = np.clip(values, -1.0, 1.0)
         elif key == "time":
             values = np.clip(values, 0.0, 2.0)
