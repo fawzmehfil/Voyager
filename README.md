@@ -47,6 +47,16 @@ invalid actions were simultaneous movement collisions. The corrected diagnosis i
 skill composition/team-state failure, not inability to navigate home. These presets remain
 diagnostic tools rather than the official benchmark training distribution.
 
+Stage 7C now replaces the failed all-or-nothing probe gate with
+`civilization_achievement_benchmark_v1` on the unchanged 600-tick island. It reports fifteen
+population achievement rates spanning gathering, delivery, workbench progression, tool
+sharing, and first-night/terminal survival, then aggregates them with a smoothed geometric
+mean. Legal random, the existing feed-forward PPO checkpoint, and recurrent PPO use the same
+seeds and scorer. Seeded-stochastic inference is primary because it evaluates the categorical
+policy PPO trained; deterministic argmax is retained as a synchronization-collapse
+diagnostic. Procedural islands and new game content remain blocked until at least one learned
+baseline exceeds random on both the aggregate score and meaningful progression achievements.
+
 ## Why This Exists
 
 Voyager is intended to compare learning methods for decentralized planning, resource
@@ -214,6 +224,37 @@ Run the focused delivery components without repeating construction and survival:
   --return-to-camp-transitions 75000 \
   --output-dir results/stage7c/delivery_components_v1_seed0
 ```
+
+Re-score legal random and the existing 250K feed-forward checkpoint with the frozen
+achievement spectrum:
+
+```bash
+.venv-train/bin/python examples/evaluate_stage7c_achievements.py \
+  --feed-forward-checkpoint results/stage7c/ppo_probe_v3_250k_seed0/checkpoints/best \
+  --episodes 20 \
+  --seed-start 40000 \
+  --output-dir results/stage7c/achievement_rescore_v1
+```
+
+Then train recurrent PPO directly on the complete environment. This is not a curriculum:
+all ten agents receive their ordinary local 604-value observations, act through the full
+270-action registry, and maintain separate GRU states while sharing one policy network.
+
+```bash
+.venv-train/bin/python examples/run_stage7c_recurrent_ppo.py \
+  --total-agent-transitions 250000 \
+  --seed 0 \
+  --dev-episodes 10 \
+  --test-episodes 20 \
+  --evaluation-milestones 250000 \
+  --output-dir results/stage7c/recurrent_ppo_250k_seed0
+```
+
+The calibration target is `legal random < feed-forward PPO < recurrent PPO` on the
+achievement spectrum. MAPPO is not implemented by default: it is added only if decentralized
+recurrent PPO still cannot establish useful separation. If no learned baseline beats random,
+the next remediation is a minimal public camp-needs vector or factorized action output before
+adding procedural generation, fishing, rescue, or longer episodes.
 
 ## Stage 5.6 Benchmark
 

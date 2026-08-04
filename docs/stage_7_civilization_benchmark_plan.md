@@ -28,14 +28,16 @@ Current implementation status as of 2026-08-04:
 |---|---|---|
 | 7A | Implemented and committed | Handcrafted 48x48 island, ten agents, two days, workbench, campfire, shelter, hunting, cooking, stalkers, Replay 2.1 |
 | 7B | Implemented and committed | Deterministic intent resolution, owned tools, transfers, food lots, spoilage, piles, damage, repair, downing, revival, ledger, Replay 2.2 |
-| 7C trainability slice | Probes v1/v2/v3 failed; diagnostic ladder complete; primitive capabilities learned but full composition failed | Versioned PPO adapters, capped mixed reward, actor identity and camp bearing, dual-mode evaluator, component profiler, and controlled acquisition/return/construction/survival tests |
-| 7C procedural substrate-7G | Planned | Procedural islands, rescue economy, MARL baselines, frozen benchmark, final viewer |
+| 7C trainability slice | Achievement scorer and recurrent PPO implemented; calibration runs pending | Failed probes preserved, primitive capabilities verified, fifteen-achievement handcrafted scorer, feed-forward re-score path, and decentralized shared-GRU PPO |
+| 7C procedural substrate-7G | Blocked on baseline separation | Procedural islands, rescue economy, scaled MARL baselines, frozen benchmark, final viewer |
 
 Stage 7B is released with a canonical Replay 2.2 demonstration that completes revival
 through public actions. The first Stage 7C run completed 2,000,009 transitions and the v2
 and v3 remediations each completed roughly 250,000 transitions. All proved the runtime fast enough but failed
-their learnability gates, so procedural generation remains blocked while the versioned v3
-failure is decomposed with the isolated learning ladder.
+their learnability gates. The learning ladder then demonstrated that gathering, returning,
+construction, and basic survival are individually learnable. Procedural generation remains
+blocked while the fixed achievement scorer tests whether feed-forward or recurrent PPO can
+compose those capabilities on the complete current island.
 
 ## Brutal Usefulness Verdict
 
@@ -660,20 +662,28 @@ Stage 7G adds presentation quality, not gameplay mechanics.
 Exit criterion: Stage 7B satisfies its written acceptance plan and is ready for an
 intentional release commit.
 
-### Stage 7C: Trainability And Procedural Substrate
+### Stage 7C: Trainability And Achievement Calibration
 
 1. Adapt the Stage 5 trainer to the v2 flattened action mask and structured observation.
-2. Run the two-million-transition feed-forward PPO learnability probe on the handcrafted
-   task.
-3. Fix representation, masking, reward, or balance problems before adding content.
-4. Profile and optimize simulation and training throughput.
-5. Add a fixed-size centralized critic state.
-6. Implement deterministic 48x48 procedural generation and validation.
-7. Create disjoint development and held-out seed manifests.
+2. Preserve the failed v1-v3 full-environment probes and the successful component tests as
+   diagnostic evidence rather than repeatedly changing the public world.
+3. Freeze a reward-independent achievement spectrum on the unchanged 600-tick handcrafted
+   island and re-score legal random plus the existing feed-forward PPO checkpoint.
+4. Train parameter-sharing recurrent PPO directly on the complete environment, with one
+   private recurrent state per decentralized agent and no diagnostic curriculum.
+5. Add MAPPO only if recurrent PPO and a minimal public team-state/action-factorization
+   remediation still fail to separate learned behavior from random.
+6. Profile and optimize simulation and training throughput throughout these pilots.
+7. Only after baseline separation, implement deterministic 48x48 procedural generation,
+   validation, and disjoint development/held-out manifests. Add centralized critic state
+   only when a MAPPO experiment actually requires it.
 
 Exit criterion:
 
-- PPO learns early progression above random.
+- At least one learned baseline exceeds legal random on the frozen achievement score and on
+  meaningful delivery, construction, or tool achievements.
+- The desired diagnostic ordering is legal random below feed-forward PPO below recurrent PPO
+  or, only if necessary, MAPPO.
 - A large seed sweep is deterministic, reachable, and valid.
 - A five-million-transition run is projected to complete overnight on the M2.
 
@@ -929,6 +939,83 @@ construction, and basic survival are individually learnable, while a fresh feed-
 policy does not compose them reliably in the full island. Diagnostic presets remain optional
 debugging tools and do not become the official training distribution.
 
+#### Handcrafted Achievement Calibration
+
+The earlier five-condition composite is retired as a Stage 7C continuation gate. It hid
+partial learning whenever a policy failed one late dependency and over-weighted an argmax
+deployment mode that makes observationally similar agents synchronize. The immutable probe
+artifacts remain valid historical experiments; they are not retroactively re-scored as
+passes.
+
+`civilization_achievement_benchmark_v1` evaluates the unchanged ten-agent, 600-tick,
+handcrafted island independently of the reward used for training. It freezes fifteen binary
+population achievements in four groups:
+
+- Gathering: food, wood, stone, and the cumulative six-wood/two-stone workbench bundle.
+- Delivery: deposit food, wood, and stone, plus hold the complete bundle simultaneously at
+  camp.
+- Progression: start and complete the workbench, craft a tool, and transfer a tool to another
+  agent or public camp storage.
+- Survival: retain a majority and then the full population through tick 300, and retain a
+  majority at tick 600.
+
+Every per-achievement success rate is reported. The aggregate is the smoothed geometric mean
+used for sparse achievement spectra:
+
+```text
+score = (exp(mean(log(1 + 100 * success_rate_i))) - 1) / 100
+```
+
+The formula prevents one zero-rate late achievement from collapsing all visible early
+learning to zero, while still penalizing a policy that succeeds only on easy achievements.
+Group scores, mean unlock ticks on successful episodes, invalid-action rate, survival, and
+episode-level records remain visible beside the aggregate.
+
+All policies use identical seeds. Seeded-stochastic inference is the primary PPO result
+because PPO trained a categorical policy distribution. Deterministic argmax remains a fully
+recorded diagnostic for synchronization or coordination collapse; it no longer alone decides
+whether the environment is learnable.
+
+Re-score legal random and the existing feed-forward checkpoint without training:
+
+```bash
+.venv-train/bin/python examples/evaluate_stage7c_achievements.py \
+  --feed-forward-checkpoint results/stage7c/ppo_probe_v3_250k_seed0/checkpoints/best \
+  --episodes 20 \
+  --seed-start 40000 \
+  --output-dir results/stage7c/achievement_rescore_v1
+```
+
+The recurrent baseline is a shared GRU actor-critic trained directly on the complete v3
+environment and reward. Each agent owns an independent hidden state; truncated PPO batches
+preserve per-agent temporal order and split at episode boundaries. The actor and critic see
+only the same local 604-value input used by feed-forward PPO. No diagnostic reset, restricted
+action set, curriculum, or global state enters this run.
+
+```bash
+.venv-train/bin/python examples/run_stage7c_recurrent_ppo.py \
+  --total-agent-transitions 250000 \
+  --seed 0 \
+  --dev-episodes 10 \
+  --test-episodes 20 \
+  --evaluation-milestones 250000 \
+  --output-dir results/stage7c/recurrent_ppo_250k_seed0
+```
+
+The desired calibration is legal random below feed-forward PPO below recurrent PPO or,
+only if necessary, MAPPO. A learned baseline separates only when its aggregate score exceeds
+random and it improves at least one meaningful delivery, construction, or tool achievement
+by ten percentage points. Strict recurrent headroom additionally requires recurrent PPO to
+beat feed-forward PPO by those same criteria.
+
+If feed-forward PPO already separates, the recurrent result measures memory headroom. If
+feed-forward fails and recurrent separates, Voyager still has a useful learned baseline but
+the strict algorithm ordering is not yet demonstrated. If neither separates, add one minimal
+public camp-needs vector or factorize the action output and repeat the short comparison.
+MAPPO and its centralized training-only state are conditional after that remediation, not an
+automatic feature. Procedural islands, fishing, rescue, and longer episodes remain blocked
+until at least one learned baseline establishes meaningful separation on this current world.
+
 ### Stage 7D: Final Economy And Rescue
 
 - Add the fishing net as the only renewable investment.
@@ -948,9 +1035,11 @@ Exit criterion:
 
 ### Stage 7E: MARL Baselines And Calibration
 
-- Stabilize parameter-sharing feed-forward PPO/IPPO.
-- Add parameter-sharing recurrent PPO.
-- Add recurrent MAPPO with centralized training and decentralized execution.
+- Carry the calibrated Stage 7C feed-forward and recurrent PPO implementations onto the
+  frozen procedural task.
+- Add recurrent MAPPO with centralized training and decentralized execution only if the
+  Stage 7C evidence or procedural task demonstrates a credit-assignment limitation that
+  decentralized recurrent PPO cannot address.
 - Run two-, five-, and at most ten-million-transition learning curves.
 - Validate the 2,400-tick horizon and choose the fixed interaction budget using the
   predeclared gates.
@@ -1125,11 +1214,16 @@ Stage 7 is complete only when:
 
 ## Immediate Order Of Work
 
-1. Run the Stage 7C delivery, construction, and survival learning tests.
-2. Use the first failed isolated task to identify the interface or learning bottleneck.
-3. Change the training protocol or scope only in response to that evidence.
-4. Re-run a short full-island gate after the isolated tests pass.
-5. Proceed to procedural generation only if meaningful early learning is demonstrated.
+1. Re-score legal random and the existing feed-forward checkpoint with
+   `civilization_achievement_benchmark_v1` on fixed seeds.
+2. Train the 250K recurrent PPO pilot directly on the complete island and evaluate it with
+   the same achievement spectrum.
+3. Check for legal random below feed-forward PPO below recurrent PPO, while requiring at
+   least one learned policy to beat random on meaningful progression achievements.
+4. If no learned policy separates, add a minimal public camp-needs vector or factorized
+   action output and repeat the short comparison; add MAPPO only if still justified.
+5. Proceed to procedural generation and new content only after useful baseline separation is
+   demonstrated.
 
 This order prevents further content work from accumulating on top of an untrainable
 interface.

@@ -544,6 +544,7 @@ class PPOTrainer:
         return {
             "stage": 7 if self.config.environment_id != COMPACT_TRAINING_ENVIRONMENT else 5,
             "algorithm": "shared_policy_ppo",
+            "model_type": "feed_forward",
             "update": update,
             "agent_steps": self.agent_steps,
             "input_dim": self.input_dim,

@@ -42,3 +42,52 @@ def build_actor_critic(
     logits = tf.keras.layers.Dense(action_count, name="policy_logits")(hidden)
     value = tf.keras.layers.Dense(1, name="value")(hidden)
     return tf.keras.Model(inputs=inputs, outputs=[logits, value], name="voyager_actor_critic")
+
+
+def build_recurrent_actor_critic(
+    input_dim: int,
+    action_count: int = ACTION_COUNT,
+    encoder_sizes: tuple[int, ...] = (128,),
+    recurrent_hidden_size: int = 128,
+    seed: int | None = None,
+) -> Any:
+    """Build a sequence actor-critic with an explicitly managed GRU state."""
+
+    if recurrent_hidden_size <= 0:
+        raise ValueError("recurrent_hidden_size must be positive.")
+    if not encoder_sizes:
+        raise ValueError("encoder_sizes must not be empty.")
+    tf = require_tensorflow()
+    if seed is not None:
+        tf.keras.utils.set_random_seed(seed)
+
+    observations = tf.keras.Input(
+        shape=(None, input_dim),
+        dtype=tf.float32,
+        name="observation_sequence",
+    )
+    initial_state = tf.keras.Input(
+        shape=(recurrent_hidden_size,),
+        dtype=tf.float32,
+        name="initial_recurrent_state",
+    )
+    hidden = observations
+    for index, hidden_size in enumerate(encoder_sizes):
+        hidden = tf.keras.layers.Dense(
+            hidden_size,
+            activation="tanh",
+            name=f"sequence_encoder_{index}",
+        )(hidden)
+    sequence, final_state = tf.keras.layers.GRU(
+        recurrent_hidden_size,
+        return_sequences=True,
+        return_state=True,
+        name="memory",
+    )(hidden, initial_state=initial_state)
+    logits = tf.keras.layers.Dense(action_count, name="policy_logits")(sequence)
+    value = tf.keras.layers.Dense(1, name="value")(sequence)
+    return tf.keras.Model(
+        inputs=[observations, initial_state],
+        outputs=[logits, value, final_state],
+        name="voyager_recurrent_actor_critic",
+    )
