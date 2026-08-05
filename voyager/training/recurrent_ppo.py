@@ -17,6 +17,7 @@ from voyager.training.advantages import compute_gae
 from voyager.training.checkpoints import save_policy_checkpoint
 from voyager.training.environments import (
     CIVILIZATION_PROBE_REWARD_CONTRACT,
+    CIVILIZATION_PROBE_V4_REWARD_CONTRACT,
     CIVILIZATION_V2_TRAINING_ENVIRONMENT,
     make_training_environment,
 )
@@ -69,8 +70,11 @@ class RecurrentPPOConfig:
                 raise ValueError(f"{name} must be positive.")
         if self.environment_id != CIVILIZATION_V2_TRAINING_ENVIRONMENT:
             raise ValueError("Recurrent Stage 7C PPO requires VoyagerCivilization-v2.")
-        if self.reward_contract != CIVILIZATION_PROBE_REWARD_CONTRACT:
-            raise ValueError("Recurrent Stage 7C PPO requires the frozen v3 reward.")
+        if self.reward_contract not in {
+            CIVILIZATION_PROBE_REWARD_CONTRACT,
+            CIVILIZATION_PROBE_V4_REWARD_CONTRACT,
+        }:
+            raise ValueError("Recurrent Stage 7C PPO requires a frozen v3/v4 reward.")
         if (self.num_agents, self.map_size, self.max_steps) != (10, 48, 600):
             raise ValueError("Recurrent Stage 7C PPO uses the unchanged 10-agent island.")
         if not 0.0 < self.gamma <= 1.0:

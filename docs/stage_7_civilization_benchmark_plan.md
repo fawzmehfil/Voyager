@@ -1016,6 +1016,131 @@ MAPPO and its centralized training-only state are conditional after that remedia
 automatic feature. Procedural islands, fishing, rescue, and longer episodes remain blocked
 until at least one learned baseline establishes meaningful separation on this current world.
 
+#### Recurrent V3 Result And Team-Objective V4
+
+The 250K recurrent v3 pilot also failed baseline separation. On twenty held-out seeds, legal
+random scored 0.139, the existing feed-forward checkpoint scored 0.049, and recurrent PPO
+scored 0.022. Recurrent PPO gathered wood in every episode but deposited no resource, never
+started the workbench, averaged 3.45 active agents at tick 300 and 0.35 at episode end, and
+selected invalid actions on 6.58 percent of transitions. Its deterministic policy collapsed
+to a 44.25 percent invalid-action rate. The result does not support memory as the sole missing
+capability and does not justify a longer blind run.
+
+One concrete interface mismatch remains: the capped v3 reward depends on cumulative team
+gathering and camp high-water progress that decentralized actors cannot observe away from
+camp. Recurrent memory cannot reconstruct nine teammates' remote contributions. Preserve v3
+and add `civilization_trainability_probe_v4` with one six-value shared objective vector:
+
+1. Capped cumulative gathered wood progress toward six.
+2. Capped cumulative gathered stone progress toward two.
+3. Camp wood high-water progress toward six.
+4. Camp stone high-water progress toward two.
+5. Workbench construction progress.
+6. Active-population fraction.
+
+The values are normalized to `[0, 1]`, identical for all agents, and add no map locations,
+creature locations, hidden identifiers, private inventories, or prescribed actions. The
+actor vector grows from 604 to 610 values. World mechanics, v2 action registry, v3 reward
+amounts, achievement scorer, and episode horizon remain unchanged so the experiment isolates
+team-state observability.
+
+Train fresh feed-forward and recurrent policies under the same v4 contract and budget:
+
+```bash
+.venv-train/bin/python examples/run_stage7c_team_objective_pilot.py \
+  --transitions-per-policy 250000 \
+  --seed 0 \
+  --dev-episodes 10 \
+  --test-episodes 20 \
+  --output-dir results/stage7c/team_objective_v4_250k_seed0
+```
+
+The evaluator must additionally publish selected verb/action distributions, carried-resource
+distance, homeward/away movement while carrying, camp arrival and deposit opportunities,
+deposit choices, peak/final carried resources, and gathered-to-deposited conversion. If v4
+establishes learned separation, content work may resume. If neither learned policy separates,
+factorize verb, argument, and target outputs with conditional masks before considering MAPPO.
+
+#### V4 Result And Factorized Feed-Forward V1
+
+The paired 250K v4 pilot did not establish learned baseline separation. On twenty held-out
+seeds, legal random scored 0.119, feed-forward PPO 0.033, and recurrent PPO 0.060. Recurrent
+PPO did learn food, wood, stone, and the complete gathering bundle in every episode, which
+confirms that the team-objective board removed some resource-selection ambiguity. However,
+neither learned policy deposited wood or stone, arrived at camp carrying those materials, or
+began the workbench. Recurrent agents moved toward camp on 41 percent of carrying moves,
+selected `GIVE` about 521 times per episode, and usually died before episode end.
+
+The next experiment changes the reference learner, not the environment. Preserve the frozen
+270-entry public action registry, replays, masks, v4 observations, reward, map, mechanics, and
+600-tick horizon. Replace the atomic categorical actor with three heads and sample:
+
+```text
+P(verb) × P(argument | verb) × P(target | verb, argument)
+```
+
+Conditional masks allow only prefixes that complete to a currently legal public action. The
+three selected log probabilities are summed, and PPO clipping is applied to that exact joint
+probability. This ensures that targeted verbs such as `GIVE` do not gain probability merely
+because sixteen target-specific entries exist, while retaining complete compatibility with
+the environment API.
+
+Run a fresh factorized feed-forward policy first:
+
+```bash
+.venv-train/bin/python examples/run_stage7c_factorized_ppo.py \
+  --total-agent-transitions 250000 \
+  --seed 0 \
+  --dev-episodes 10 \
+  --test-episodes 20 \
+  --output-dir results/stage7c/factorized_ppo_v1_250k_seed0
+```
+
+The runner compares legal random, the prior atomic v4 checkpoint when available, and the new
+factorized policy under deterministic and seeded-stochastic inference. It records the full
+achievement spectrum and return diagnostics. If return/deposit behavior emerges, train a
+factorized recurrent policy next. If it does not, reassess navigation and task composition
+before MAPPO. Content expansion remains blocked until a learned baseline separates.
+
+The completed factorized feed-forward run scored 0.048, compared with 0.033 for atomic
+feed-forward PPO and 0.119 for legal random. It gathered wood in every held-out episode,
+stone in 95%, and the complete gathered workbench bundle in 95%. `GIVE` fell from roughly
+521 selections per recurrent-v4 episode to fewer than one per factorized episode, validating
+the action-multiplicity diagnosis. However, it deposited wood in only one of twenty held-out
+episodes, never deposited stone, never assembled the camp bundle, never began the workbench,
+and averaged 0.8 active agents at episode end. Development evaluation contained no material
+deposit at all.
+
+The earlier runner interpreted that single held-out deposit as behavior emergence. Correct
+the evaluator to match the simulator's camp interaction range of Manhattan distance at most
+one, and replace the any-event rule with a predeclared repeatability threshold: a material
+deposit or return arrival must occur in at least 20% of episodes. The threshold must pass on
+both development and held-out seeds.
+
+#### Final Factorized-Recurrent Composition Test
+
+Run exactly one remaining algorithm-composition experiment on the unchanged v4 task. The
+actor uses the same factorized conditional masks and exact joint PPO probability as the
+feed-forward policy, while a GRU preserves independent hidden state for every agent. Training
+uses episode-safe truncated sequences and decentralized 610-value observations. No global
+critic, privileged state, curriculum, altered reward, new mechanics, or longer budget enters
+this experiment.
+
+```bash
+.venv-train/bin/python examples/run_stage7c_factorized_recurrent_ppo.py \
+  --total-agent-transitions 250000 \
+  --seed 0 \
+  --dev-episodes 10 \
+  --test-episodes 20 \
+  --output-dir results/stage7c/factorized_recurrent_v1_250k_seed0
+```
+
+The run is successful only if repeatable delivery appears on both seed sets and the held-out
+policy exceeds legal random in aggregate score with a meaningful delivery, construction, or
+tool achievement advantage. Success triggers replication across independent training seeds.
+Failure triggers task/interface simplification. MAPPO is explicitly not authorized by this
+gate because the evidence has not isolated centralized credit assignment as the bottleneck.
+
 ### Stage 7D: Final Economy And Rescue
 
 - Add the fishing net as the only renewable investment.

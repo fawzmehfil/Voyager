@@ -15,6 +15,9 @@ CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER = "civilization_v2_identity_flat_v2
 CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER = (
     "civilization_v3_navigation_flat_v3"
 )
+CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_ENCODER = (
+    "civilization_v4_team_objective_flat_v4"
+)
 
 OBSERVATION_KEYS = ("local_view", "stats", "inventory", "role", "camp", "progress")
 CIVILIZATION_V2_OBSERVATION_KEYS = (
@@ -37,6 +40,10 @@ CIVILIZATION_V3_NAVIGATION_OBSERVATION_KEYS = (
     *CIVILIZATION_V2_IDENTITY_OBSERVATION_KEYS,
     "camp_bearing",
 )
+CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_KEYS = (
+    *CIVILIZATION_V3_NAVIGATION_OBSERVATION_KEYS,
+    "team_objective",
+)
 
 
 def flatten_observation(
@@ -49,12 +56,15 @@ def flatten_observation(
         CIVILIZATION_V2_OBSERVATION_ENCODER,
         CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER,
         CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER,
+        CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_ENCODER,
     }:
         keys: tuple[str, ...] = CIVILIZATION_V2_OBSERVATION_KEYS
         if encoder_id == CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER:
             keys = CIVILIZATION_V2_IDENTITY_OBSERVATION_KEYS
         elif encoder_id == CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER:
             keys = CIVILIZATION_V3_NAVIGATION_OBSERVATION_KEYS
+        elif encoder_id == CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_ENCODER:
+            keys = CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_KEYS
         return _flatten_civilization_v2_observation(observation, keys)
     if encoder_id != COMPACT_OBSERVATION_ENCODER:
         raise ValueError(f"Unknown observation encoder: {encoder_id!r}.")
@@ -100,11 +110,14 @@ def flat_observation_size(
         keys = CIVILIZATION_V2_IDENTITY_OBSERVATION_KEYS
     elif encoder_id == CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER:
         keys = CIVILIZATION_V3_NAVIGATION_OBSERVATION_KEYS
+    elif encoder_id == CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_ENCODER:
+        keys = CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_KEYS
     if encoder_id not in {
         COMPACT_OBSERVATION_ENCODER,
         CIVILIZATION_V2_OBSERVATION_ENCODER,
         CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER,
         CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER,
+        CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_ENCODER,
     }:
         raise ValueError(f"Unknown observation encoder: {encoder_id!r}.")
     size = 0

@@ -28,6 +28,7 @@ from voyager.training.environments import (
     CIVILIZATION_PROBE_REWARD_CONTRACT,
     CIVILIZATION_PROBE_V1_REWARD_CONTRACT,
     CIVILIZATION_PROBE_V2_REWARD_CONTRACT,
+    CIVILIZATION_PROBE_V4_REWARD_CONTRACT,
     CIVILIZATION_V2_TRAINING_ENVIRONMENT,
     make_training_environment,
 )
@@ -69,8 +70,87 @@ def test_v3_training_adapter_exposes_navigation_actor_contract() -> None:
     assert observation["agent_identity"].sum() == 1
     assert observation["agent_identity"][0] == 1
     assert observation["camp_bearing"].shape == (3,)
+    assert "team_objective" not in observation
     assert np.allclose(observation["camp_bearing"], 0.0)
     assert np.all(np.isfinite(encoded))
+
+
+def test_v4_team_objective_is_shared_bounded_and_tracks_reward_state() -> None:
+    training_environment = make_training_environment(
+        environment_id=CIVILIZATION_V2_TRAINING_ENVIRONMENT,
+        reward_contract=CIVILIZATION_PROBE_V4_REWARD_CONTRACT,
+        num_agents=10,
+        map_size=48,
+        max_steps=600,
+        reward_mode="none",
+        disabled_reward_components=(),
+        mask_role_observation=False,
+    )
+    env = training_environment.env
+    observations, _infos = env.reset(seed=0)
+
+    assert training_environment.observation_encoder == (
+        "civilization_v4_team_objective_flat_v4"
+    )
+    assert flatten_observation(
+        observations["agent_0"], training_environment.observation_encoder
+    ).shape == (610,)
+    expected_initial = np.array([0, 0, 0, 0, 0, 1], dtype=np.float32)
+    for observation in observations.values():
+        np.testing.assert_allclose(observation["team_objective"], expected_initial)
+
+    state = env.world.state
+    assert state is not None
+    wood_y, wood_x = np.argwhere(
+        (state.resource_ids == Resource.WOOD) & (state.resource_quantities > 0)
+    )[0]
+    stone_y, stone_x = np.argwhere(
+        (state.resource_ids == Resource.STONE) & (state.resource_quantities > 0)
+    )[0]
+    state.agents["agent_0"].x, state.agents["agent_0"].y = int(wood_x), int(
+        wood_y
+    )
+    state.agents["agent_1"].x, state.agents["agent_1"].y = int(stone_x), int(
+        stone_y
+    )
+    noop = flatten_v2_action(
+        CivilizationV2Verb.NOOP, CivilizationV2Argument.NONE, 0
+    )
+    gather = flatten_v2_action(
+        CivilizationV2Verb.INTERACT, CivilizationV2Argument.NONE, 0
+    )
+    actions = {agent_id: noop for agent_id in env.agents}
+    actions.update({"agent_0": gather, "agent_1": gather})
+    observations, _rewards, _terminations, _truncations, _infos = env.step(actions)
+    expected_gathered = np.array([1 / 6, 1 / 2, 0, 0, 0, 1], dtype=np.float32)
+    np.testing.assert_allclose(
+        observations["agent_0"]["team_objective"], expected_gathered
+    )
+    np.testing.assert_allclose(
+        observations["agent_1"]["team_objective"], expected_gathered
+    )
+
+    state = env.world.state
+    assert state is not None
+    for agent_id in ("agent_0", "agent_1"):
+        state.agents[agent_id].x = state.camp.x
+        state.agents[agent_id].y = state.camp.y
+    actions = {agent_id: noop for agent_id in env.agents}
+    actions["agent_0"] = flatten_v2_action(
+        CivilizationV2Verb.DEPOSIT, CivilizationV2Argument.WOOD, 0
+    )
+    actions["agent_1"] = flatten_v2_action(
+        CivilizationV2Verb.DEPOSIT, CivilizationV2Argument.STONE, 0
+    )
+    observations, _rewards, _terminations, _truncations, _infos = env.step(actions)
+    expected_delivered = np.array(
+        [1 / 6, 1 / 2, 1 / 6, 1 / 2, 0, 1], dtype=np.float32
+    )
+    np.testing.assert_allclose(
+        observations["agent_0"]["team_objective"], expected_delivered
+    )
+    assert np.all(observations["agent_0"]["team_objective"] >= 0)
+    assert np.all(observations["agent_0"]["team_objective"] <= 1)
 
 
 def test_v2_probe_contract_retains_601_value_identity_observation() -> None:

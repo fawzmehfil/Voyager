@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -18,6 +19,7 @@ from voyager.training.civilization_achievements import (
     smoothed_geometric_mean,
     summarize_achievement_results,
 )
+from voyager.training.environments import CIVILIZATION_PROBE_V4_REWARD_CONTRACT
 from voyager.training.recurrent_ppo import RecurrentPPOConfig, RecurrentPPOTrainer
 
 
@@ -94,6 +96,37 @@ def test_summary_reports_every_rate_and_geometric_score() -> None:
     assert 0.0 < achievement_score < 1.0
 
 
+def test_summary_reports_action_and_return_diagnostics() -> None:
+    result = _episode(
+        {achievement: False for achievement in ACHIEVEMENT_IDS}, seed=3
+    )
+    result = replace(
+        result,
+        selected_verbs={"move": 4, "deposit": 1},
+        selected_actions={"move:north:untargeted": 4},
+        return_diagnostics={
+            "carrying_move_actions": 4.0,
+            "homeward_moves": 3.0,
+            "homeward_move_rate": 0.75,
+        },
+        peak_team_carried={"wood": 6, "stone": 2},
+        final_team_carried={"wood": 1, "stone": 0},
+    )
+
+    summary = summarize_achievement_results([result])
+
+    assert summary["mean_selected_verbs_per_episode"] == {
+        "deposit": 1.0,
+        "move": 4.0,
+    }
+    assert summary["mean_return_diagnostics"] == {
+        "carrying_move_actions": 4.0,
+        "homeward_move_rate": 0.75,
+        "homeward_moves": 3.0,
+    }
+    assert summary["mean_peak_team_carried"] == {"stone": 2.0, "wood": 6.0}
+
+
 def test_calibration_requires_score_and_meaningful_progression_separation() -> None:
     random_summary = _summary_with_rates({})
     feed_forward = _summary_with_rates(
@@ -155,6 +188,28 @@ def test_recurrent_ppo_collects_episode_safe_masked_sequences() -> None:
     )
     losses = trainer.update_policy(batch, entropy_coef=0.01)
     assert all(np.isfinite(value) for value in losses.values())
+
+
+def test_recurrent_ppo_collects_v4_team_objective_observation() -> None:
+    pytest.importorskip("tensorflow")
+    trainer = RecurrentPPOTrainer(
+        RecurrentPPOConfig(
+            total_steps=10,
+            rollout_steps=1,
+            train_epochs=1,
+            sequence_length=1,
+            sequence_minibatch_size=2,
+            encoder_sizes=(8,),
+            recurrent_hidden_size=8,
+            checkpoint_dir=None,
+            reward_contract=CIVILIZATION_PROBE_V4_REWARD_CONTRACT,
+        )
+    )
+
+    batch = trainer.collect_rollout()
+
+    assert batch.agent_steps == 10
+    assert batch.observations.shape == (10, 1, 610)
 
 
 def test_recurrent_checkpoint_round_trip(tmp_path: Path) -> None:

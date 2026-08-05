@@ -20,6 +20,7 @@ from voyager.training.civilization_learning_ladder import (
 from voyager.training.civilization_probe import (
     PROBE_REWARD_V1,
     PROBE_REWARD_V2,
+    PROBE_REWARD_V4,
     PROBE_REWARD_VERSION,
     CivilizationProbeRewardWrapper,
 )
@@ -27,6 +28,7 @@ from voyager.training.obs import (
     CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER,
     CIVILIZATION_V2_OBSERVATION_ENCODER,
     CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER,
+    CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_ENCODER,
     COMPACT_OBSERVATION_ENCODER,
 )
 from voyager.versions import (
@@ -42,6 +44,7 @@ COMPACT_TRAINING_ENVIRONMENT = "VoyagerSurvival-v0"
 CIVILIZATION_V2_TRAINING_ENVIRONMENT = "VoyagerCivilization-v2"
 ENVIRONMENT_REWARD_CONTRACT = "environment"
 CIVILIZATION_PROBE_REWARD_CONTRACT = PROBE_REWARD_VERSION
+CIVILIZATION_PROBE_V4_REWARD_CONTRACT = PROBE_REWARD_V4
 CIVILIZATION_PROBE_V1_REWARD_CONTRACT = PROBE_REWARD_V1
 CIVILIZATION_PROBE_V2_REWARD_CONTRACT = PROBE_REWARD_V2
 CIVILIZATION_LEARNING_TASK_CONTRACTS = frozenset(LEARNING_TASK_CONTRACTS.values())
@@ -123,6 +126,7 @@ def make_training_environment(
             CIVILIZATION_PROBE_V1_REWARD_CONTRACT,
             CIVILIZATION_PROBE_V2_REWARD_CONTRACT,
             CIVILIZATION_PROBE_REWARD_CONTRACT,
+            CIVILIZATION_PROBE_V4_REWARD_CONTRACT,
         }:
             raise ValueError(
                 "VoyagerCivilization-v2 training requires the versioned Stage 7C probe reward."
@@ -133,19 +137,25 @@ def make_training_environment(
             reward_version=reward_contract,
         )
         is_v3_probe = reward_contract == CIVILIZATION_PROBE_REWARD_CONTRACT
+        is_v4_probe = reward_contract == CIVILIZATION_PROBE_V4_REWARD_CONTRACT
         is_identity_probe = reward_contract in {
             CIVILIZATION_PROBE_V2_REWARD_CONTRACT,
             CIVILIZATION_PROBE_REWARD_CONTRACT,
+            CIVILIZATION_PROBE_V4_REWARD_CONTRACT,
         }
         return TrainingEnvironment(
             env=env,
             observation_encoder=(
-                CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER
-                if is_v3_probe
+                CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_ENCODER
+                if is_v4_probe
                 else (
-                    CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER
-                    if is_identity_probe
-                    else CIVILIZATION_V2_OBSERVATION_ENCODER
+                    CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER
+                    if is_v3_probe
+                    else (
+                        CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER
+                        if is_identity_probe
+                        else CIVILIZATION_V2_OBSERVATION_ENCODER
+                    )
                 )
             ),
             num_agents=10,
@@ -155,24 +165,32 @@ def make_training_environment(
                 "environment_version": "voyager_civilization_v2",
                 "reward_version": reward_contract,
                 "observation_version": (
-                    "civilization_training_observation_v3"
-                    if is_v3_probe
+                    "civilization_training_observation_v4"
+                    if is_v4_probe
                     else (
-                        "civilization_training_observation_v2"
-                        if is_identity_probe
-                        else "civilization_local_observation_v2"
+                        "civilization_training_observation_v3"
+                        if is_v3_probe
+                        else (
+                            "civilization_training_observation_v2"
+                            if is_identity_probe
+                            else "civilization_local_observation_v2"
+                        )
                     )
                 ),
                 "action_version": "civilization_flattened_action_v2",
                 "achievement_version": "civilization_achievements_v1",
                 "scenario_version": "voyager_civilization_vertical_slice_v1",
                 "training_revision": (
-                    "7C-trainability-v3"
-                    if is_v3_probe
+                    "7C-team-objective-v4"
+                    if is_v4_probe
                     else (
-                        "7C-trainability-v2"
-                        if is_identity_probe
-                        else "7C-trainability-v1"
+                        "7C-trainability-v3"
+                        if is_v3_probe
+                        else (
+                            "7C-trainability-v2"
+                            if is_identity_probe
+                            else "7C-trainability-v1"
+                        )
                     )
                 ),
             },

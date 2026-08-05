@@ -44,6 +44,41 @@ def build_actor_critic(
     return tf.keras.Model(inputs=inputs, outputs=[logits, value], name="voyager_actor_critic")
 
 
+def build_factorized_actor_critic(
+    input_dim: int,
+    verb_count: int,
+    argument_count: int,
+    target_count: int,
+    hidden_sizes: tuple[int, ...] = (128, 128),
+    seed: int | None = None,
+) -> Any:
+    """Build an MLP actor-critic with verb, argument, and target policy heads."""
+
+    if min(verb_count, argument_count, target_count) <= 0:
+        raise ValueError("Factorized component counts must be positive.")
+    tf = require_tensorflow()
+    if seed is not None:
+        tf.keras.utils.set_random_seed(seed)
+
+    inputs = tf.keras.Input(shape=(input_dim,), dtype=tf.float32, name="observation")
+    hidden = inputs
+    for index, hidden_size in enumerate(hidden_sizes):
+        hidden = tf.keras.layers.Dense(
+            hidden_size,
+            activation="tanh",
+            name=f"hidden_{index}",
+        )(hidden)
+    verb_logits = tf.keras.layers.Dense(verb_count, name="verb_logits")(hidden)
+    argument_logits = tf.keras.layers.Dense(argument_count, name="argument_logits")(hidden)
+    target_logits = tf.keras.layers.Dense(target_count, name="target_logits")(hidden)
+    value = tf.keras.layers.Dense(1, name="value")(hidden)
+    return tf.keras.Model(
+        inputs=inputs,
+        outputs=[verb_logits, argument_logits, target_logits, value],
+        name="voyager_factorized_actor_critic",
+    )
+
+
 def build_recurrent_actor_critic(
     input_dim: int,
     action_count: int = ACTION_COUNT,
@@ -90,4 +125,59 @@ def build_recurrent_actor_critic(
         inputs=[observations, initial_state],
         outputs=[logits, value, final_state],
         name="voyager_recurrent_actor_critic",
+    )
+
+
+def build_factorized_recurrent_actor_critic(
+    input_dim: int,
+    verb_count: int,
+    argument_count: int,
+    target_count: int,
+    encoder_sizes: tuple[int, ...] = (128,),
+    recurrent_hidden_size: int = 128,
+    seed: int | None = None,
+) -> Any:
+    """Build a GRU actor-critic with factorized action-component heads."""
+
+    if recurrent_hidden_size <= 0:
+        raise ValueError("recurrent_hidden_size must be positive.")
+    if not encoder_sizes:
+        raise ValueError("encoder_sizes must not be empty.")
+    if min(verb_count, argument_count, target_count) <= 0:
+        raise ValueError("Factorized component counts must be positive.")
+    tf = require_tensorflow()
+    if seed is not None:
+        tf.keras.utils.set_random_seed(seed)
+
+    observations = tf.keras.Input(
+        shape=(None, input_dim),
+        dtype=tf.float32,
+        name="observation_sequence",
+    )
+    initial_state = tf.keras.Input(
+        shape=(recurrent_hidden_size,),
+        dtype=tf.float32,
+        name="initial_recurrent_state",
+    )
+    hidden = observations
+    for index, hidden_size in enumerate(encoder_sizes):
+        hidden = tf.keras.layers.Dense(
+            hidden_size,
+            activation="tanh",
+            name=f"sequence_encoder_{index}",
+        )(hidden)
+    sequence, final_state = tf.keras.layers.GRU(
+        recurrent_hidden_size,
+        return_sequences=True,
+        return_state=True,
+        name="memory",
+    )(hidden, initial_state=initial_state)
+    verb_logits = tf.keras.layers.Dense(verb_count, name="verb_logits")(sequence)
+    argument_logits = tf.keras.layers.Dense(argument_count, name="argument_logits")(sequence)
+    target_logits = tf.keras.layers.Dense(target_count, name="target_logits")(sequence)
+    value = tf.keras.layers.Dense(1, name="value")(sequence)
+    return tf.keras.Model(
+        inputs=[observations, initial_state],
+        outputs=[verb_logits, argument_logits, target_logits, value, final_state],
+        name="voyager_factorized_recurrent_actor_critic",
     )

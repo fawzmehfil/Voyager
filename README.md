@@ -256,6 +256,77 @@ recurrent PPO still cannot establish useful separation. If no learned baseline b
 the next remediation is a minimal public camp-needs vector or factorized action output before
 adding procedural generation, fishing, rescue, or longer episodes.
 
+The first recurrent 250K pilot did not separate: legal random scored `0.139`, feed-forward
+PPO `0.049`, and recurrent PPO `0.022`. Recurrent PPO gathered wood in every held-out episode
+but made no resource deposit, never began the workbench, and ended with only 0.35 active
+agents on average. This rules out memory alone as the immediate fix.
+
+`civilization_trainability_probe_v4` therefore adds a six-value public team-objective board
+to the v3 actor input: cumulative gathered and delivered progress for the workbench's wood
+and stone requirements, workbench progress, and active-population fraction. It exposes no
+resource locations or private inventories. The v1-v3 contracts and checkpoints remain
+unchanged. Run fresh, seed-matched feed-forward and recurrent policies under v4 with:
+
+```bash
+.venv-train/bin/python examples/run_stage7c_team_objective_pilot.py \
+  --transitions-per-policy 250000 \
+  --seed 0 \
+  --dev-episodes 10 \
+  --test-episodes 20 \
+  --output-dir results/stage7c/team_objective_v4_250k_seed0
+```
+
+The v4 evaluator additionally reports action distributions, carried-resource distance and
+homeward movement, camp return opportunities, deposit choices, and deposit conversion. In
+the completed v4 pilot, recurrent PPO learned the complete gathering bundle in every episode
+but neither learned policy returned wood or stone to camp or began the workbench. Recurrent
+PPO also overselected `GIVE` (about 521 times per episode), exposing bias from representing
+each valid `(verb, argument, target)` triple as an unrelated categorical action.
+
+The next controlled baseline keeps the public 270-action registry unchanged but factorizes
+the PPO actor into `verb -> valid argument -> valid target`. PPO trains the sum of the three
+conditional log probabilities as one joint action probability. This shares learning between
+actions with the same verb and prevents verbs with many target combinations from receiving
+extra probability mass solely because they occupy more registry entries. Run the 250K
+feed-forward pilot with:
+
+```bash
+.venv-train/bin/python examples/run_stage7c_factorized_ppo.py \
+  --total-agent-transitions 250000 \
+  --seed 0 \
+  --dev-episodes 10 \
+  --test-episodes 20 \
+  --output-dir results/stage7c/factorized_ppo_v1_250k_seed0
+```
+
+Only if factorized feed-forward PPO exhibits resource-return or deposit behavior should a
+factorized recurrent policy be trained. MAPPO remains blocked until actor representation and
+navigation are no longer the demonstrated failure.
+
+The completed factorized feed-forward pilot improved gathering and removed the duplicated
+target bias, but it did not solve the economy: it scored `0.048` against random's `0.119`,
+assembled the gathered resource bundle in 95% of held-out episodes, deposited one wood in
+only one of twenty episodes, never deposited stone, and never began the workbench. The
+original automatic gate was too permissive because one deposit counted as emergence, and its
+camp-return diagnostic incorrectly used distance zero although Civilization permits camp
+interaction at Manhattan distance one. The corrected gate requires delivery in at least 20%
+of both development and held-out episodes.
+
+One final controlled composition test combines recurrent memory with factorized actions:
+
+```bash
+.venv-train/bin/python examples/run_stage7c_factorized_recurrent_ppo.py \
+  --total-agent-transitions 250000 \
+  --seed 0 \
+  --dev-episodes 10 \
+  --test-episodes 20 \
+  --output-dir results/stage7c/factorized_recurrent_v1_250k_seed0
+```
+
+If this policy establishes repeatable delivery and meaningful achievement separation above
+random, replicate it across training seeds. Otherwise stop adding algorithms and simplify
+the task or agent interface; the runner explicitly does not authorize MAPPO.
+
 ## Stage 5.6 Benchmark
 
 The final benchmark evaluates random, greedy, cooperative, and all three frozen PPO checkpoints on seeds `10000000` through `10000099`. Deterministic PPO is the official learned-policy result; stochastic PPO is reported separately.

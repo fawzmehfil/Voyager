@@ -6,7 +6,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from voyager.training.model import build_actor_critic, build_recurrent_actor_critic
+from voyager.training.model import (
+    build_actor_critic,
+    build_factorized_actor_critic,
+    build_factorized_recurrent_actor_critic,
+    build_recurrent_actor_critic,
+)
 
 METADATA_FILE = "metadata.json"
 WEIGHTS_FILE = "model.weights.h5"
@@ -25,7 +30,9 @@ def save_policy_checkpoint(
     model.save_weights(str(weights_path))
     full_metadata = dict(metadata)
     full_metadata["weights_file"] = WEIGHTS_FILE
-    (path / METADATA_FILE).write_text(json.dumps(full_metadata, indent=2, sort_keys=True), encoding="utf-8")
+    (path / METADATA_FILE).write_text(
+        json.dumps(full_metadata, indent=2, sort_keys=True), encoding="utf-8"
+    )
     return path
 
 
@@ -47,6 +54,25 @@ def load_policy_checkpoint(checkpoint_path: str | Path) -> tuple[Any, dict[str, 
         model = build_recurrent_actor_critic(
             input_dim=int(metadata["input_dim"]),
             action_count=int(metadata["action_count"]),
+            encoder_sizes=encoder_sizes,
+            recurrent_hidden_size=int(metadata["recurrent_hidden_size"]),
+        )
+    elif model_type == "factorized_feed_forward":
+        hidden_sizes = tuple(int(value) for value in metadata["hidden_sizes"])
+        model = build_factorized_actor_critic(
+            input_dim=int(metadata["input_dim"]),
+            verb_count=int(metadata["verb_count"]),
+            argument_count=int(metadata["argument_count"]),
+            target_count=int(metadata["target_count"]),
+            hidden_sizes=hidden_sizes,
+        )
+    elif model_type == "factorized_recurrent_gru":
+        encoder_sizes = tuple(int(value) for value in metadata["encoder_sizes"])
+        model = build_factorized_recurrent_actor_critic(
+            input_dim=int(metadata["input_dim"]),
+            verb_count=int(metadata["verb_count"]),
+            argument_count=int(metadata["argument_count"]),
+            target_count=int(metadata["target_count"]),
             encoder_sizes=encoder_sizes,
             recurrent_hidden_size=int(metadata["recurrent_hidden_size"]),
         )

@@ -17,8 +17,9 @@ from voyager.envs.civilization_v2 import (
 PROBE_REWARD_V1 = "civilization_trainability_probe_v1"
 PROBE_REWARD_V2 = "civilization_trainability_probe_v2"
 PROBE_REWARD_VERSION = "civilization_trainability_probe_v3"
+PROBE_REWARD_V4 = "civilization_trainability_probe_v4"
 PROBE_REWARD_VERSIONS = frozenset(
-    {PROBE_REWARD_V1, PROBE_REWARD_V2, PROBE_REWARD_VERSION}
+    {PROBE_REWARD_V1, PROBE_REWARD_V2, PROBE_REWARD_VERSION, PROBE_REWARD_V4}
 )
 
 WORKBENCH_RESOURCE_REQUIREMENTS = {"wood": 6, "stone": 2}
@@ -46,11 +47,17 @@ class CivilizationProbeRewardWrapper(
         self.possible_agents = list(self.env.possible_agents)
         self.agents = list(self.env.agents)
         self.observation_spaces = dict(self.env.observation_spaces)
-        if reward_version in {PROBE_REWARD_V2, PROBE_REWARD_VERSION}:
+        if reward_version in {
+            PROBE_REWARD_V2,
+            PROBE_REWARD_VERSION,
+            PROBE_REWARD_V4,
+        }:
             self.observation_spaces = {
                 agent_id: self._augmented_observation_space(
                     space,
-                    include_camp_bearing=reward_version == PROBE_REWARD_VERSION,
+                    include_camp_bearing=reward_version
+                    in {PROBE_REWARD_VERSION, PROBE_REWARD_V4},
+                    include_team_objective=reward_version == PROBE_REWARD_V4,
                 )
                 for agent_id, space in self.observation_spaces.items()
             }
@@ -121,7 +128,7 @@ class CivilizationProbeRewardWrapper(
         assert state is not None
         new_ledger = state.ledger[self._ledger_cursor :]
         self._ledger_cursor = len(state.ledger)
-        if self.reward_version == PROBE_REWARD_VERSION:
+        if self.reward_version in {PROBE_REWARD_VERSION, PROBE_REWARD_V4}:
             shared_components, individual_components = self._reward_components_v3(
                 new_ledger=new_ledger,
                 before_workbench=before_workbench,
@@ -443,7 +450,7 @@ class CivilizationProbeRewardWrapper(
                 **observation,
                 "agent_identity": identity,
             }
-            if self.reward_version == PROBE_REWARD_VERSION:
+            if self.reward_version in {PROBE_REWARD_VERSION, PROBE_REWARD_V4}:
                 state = self.world.state
                 assert state is not None
                 agent = state.agents[agent_id]
@@ -461,6 +468,28 @@ class CivilizationProbeRewardWrapper(
                     ],
                     dtype=np.float32,
                 )
+            if self.reward_version == PROBE_REWARD_V4:
+                state = self.world.state
+                assert state is not None
+                active_fraction = sum(
+                    agent.life_state == "active"
+                    for agent in state.agents.values()
+                ) / len(state.agents)
+                values["team_objective"] = np.array(
+                    [
+                        self._v3_gather_credit["wood"]
+                        / WORKBENCH_RESOURCE_REQUIREMENTS["wood"],
+                        self._v3_gather_credit["stone"]
+                        / WORKBENCH_RESOURCE_REQUIREMENTS["stone"],
+                        self._v3_camp_high_water["wood"]
+                        / WORKBENCH_RESOURCE_REQUIREMENTS["wood"],
+                        self._v3_camp_high_water["stone"]
+                        / WORKBENCH_RESOURCE_REQUIREMENTS["stone"],
+                        state.structures["workbench"].progress,
+                        active_fraction,
+                    ],
+                    dtype=np.float32,
+                )
             augmented[agent_id] = values
         return augmented
 
@@ -469,6 +498,7 @@ class CivilizationProbeRewardWrapper(
         space: spaces.Space,
         *,
         include_camp_bearing: bool,
+        include_team_objective: bool,
     ) -> spaces.Dict:
         if not isinstance(space, spaces.Dict):
             raise TypeError("Civilization v2 requires a Dict observation space.")
@@ -484,6 +514,13 @@ class CivilizationProbeRewardWrapper(
             additions["camp_bearing"] = spaces.Box(
                 low=np.array([-1.0, -1.0, 0.0], dtype=np.float32),
                 high=np.ones(3, dtype=np.float32),
+                dtype=np.float32,
+            )
+        if include_team_objective:
+            additions["team_objective"] = spaces.Box(
+                0.0,
+                1.0,
+                shape=(6,),
                 dtype=np.float32,
             )
         return spaces.Dict(
