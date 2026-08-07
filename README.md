@@ -225,6 +225,40 @@ The current oracle passes the solvability gate on all 100 test seeds: every achi
 completed on at least 96% of islands, rescue succeeds on 96%, and the achievement geometric
 mean is `0.986`. This is a solvability check, not a learned benchmark result.
 
+Validate one official procedural run without creating artifacts or loading TensorFlow:
+
+```bash
+.venv-train/bin/python examples/run_stage7_island_procedural.py train \
+  --algorithm feed_forward_ppo \
+  --training-seed 0 \
+  --dry-run
+```
+
+The official procedural matrix contains six separate one-million-transition commands:
+
+```bash
+.venv-train/bin/python examples/run_stage7_island_procedural.py train --algorithm feed_forward_ppo --training-seed 0
+.venv-train/bin/python examples/run_stage7_island_procedural.py train --algorithm feed_forward_ppo --training-seed 1
+.venv-train/bin/python examples/run_stage7_island_procedural.py train --algorithm feed_forward_ppo --training-seed 2
+.venv-train/bin/python examples/run_stage7_island_procedural.py train --algorithm recurrent_ppo --training-seed 0
+.venv-train/bin/python examples/run_stage7_island_procedural.py train --algorithm recurrent_ppo --training-seed 1
+.venv-train/bin/python examples/run_stage7_island_procedural.py train --algorithm recurrent_ppo --training-seed 2
+```
+
+Each command trains only on the frozen `0-999` manifest, evaluates five checkpoints on all
+50 development islands, and locks the strongest seeded-stochastic achievement score. It does
+not access held-out test islands. After all six selections are locked, intentionally open the
+test split once with:
+
+```bash
+.venv-train/bin/python examples/run_stage7_island_procedural.py finalize
+```
+
+Use `--smoke` on a training command for a nonofficial 2,560-transition integration check.
+Smoke runs default to `results/stage7/procedural_baselines_smoke_v1`, separate from the
+official experiment root. Generated runs remain under `results/`; they are not benchmark
+evidence until the complete official matrix is finalized and statistically analyzed.
+
 ## Stage 5.6 Benchmark
 
 The final benchmark evaluates random, greedy, cooperative, and all three frozen PPO checkpoints on seeds `10000000` through `10000099`. Deterministic PPO is the official learned-policy result; stochastic PPO is reported separately.

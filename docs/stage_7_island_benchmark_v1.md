@@ -312,6 +312,32 @@ If a gate fails, adjust only resource distance, difficulty, compact observation 
 reward magnitude, or action legality. Do not add content, silently increase the budget, tune
 on test seeds, or substitute a more complex algorithm before diagnosing the public task.
 
+### Procedural experiment protocol
+
+The procedural runner uses `voyager_island_procedural_baselines_v1`. One command trains one
+algorithm and training seed. Official runs are restricted to feed-forward PPO and recurrent
+PPO, seeds 0/1/2, one million agent transitions, reward v4, and checkpoints at 200K intervals.
+
+Environment episode seeds are distinct from the policy training seed. For each run, a
+versioned deterministic scheduler shuffles the 1,000 training-manifest islands and consumes
+each once before beginning another deterministic cycle. Feed-forward and recurrent runs with
+the same training seed receive the same island order. Checkpoints are evaluated in stochastic
+and deterministic modes on all 50 development islands; stochastic achievement geometric mean
+selects, lower invalid-action rate breaks ties, and the earlier milestone wins an exact tie.
+
+Training writes an immutable selection whose test-access field remains false. Test evaluation
+is not an automatic tail of training: a separate `finalize` command refuses to run until all
+six official selections exist and agree on Git revision, contracts, budgets, schedules, and
+manifest hashes. It then evaluates random, oracle, and every selected learned checkpoint on
+all 100 test islands. Rerunning finalization is refused after the final artifact exists.
+
+The runner exports resolved configs, exact environment-seed histories, JSONL/CSV learning
+curves, raw development episodes, milestone summaries, checkpoint hashes, selection records,
+timing, and artifact hashes. Smoke runs use two development islands and 2,560 transitions,
+are explicitly nonofficial, and cannot be finalized as benchmark results. Interrupted runs
+are not approximately resumed because the current checkpoints do not serialize optimizer,
+rollout, environment, and RNG state together.
+
 ## Replays And Release
 
 Replay 2.3 records compact actions, achievement unlocks, beacon progress, rescue, creatures,

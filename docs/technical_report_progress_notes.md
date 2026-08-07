@@ -415,3 +415,21 @@ campfire `5%`, first-night achievement `90%`, and invalid actions `0.29%`.
 This closes the immediate setup problem: ordinary feed-forward PPO can now reliably enter
 and advance the economy. It does not solve the full task, and procedural calibration or new
 content should not be conflated with this fixed-island result.
+
+## Procedural Baseline Runner
+
+The next implementation converts procedural support into an auditable experiment protocol.
+Feed-forward and recurrent PPO now accept a manifest-backed episode scheduler rather than
+deriving every island from `training_seed + reset_count`. Each seed visits only the frozen
+0-999 training split in deterministic shuffled cycles, and matching algorithm runs receive
+matching island orders. Earlier trainers retain their original reset behavior when no
+schedule is supplied.
+
+The runner handles one algorithm/seed per command, evaluates 200K milestones only on the 50
+development islands, and locks the best seeded-stochastic achievement score with invalid rate
+and earlier milestone as tie-breakers. A separate suite finalizer is the only path that opens
+the 100 held-out test islands, and it refuses to run until all six one-million-transition
+selections are complete and contract-identical. Exact configs, episode seeds, histories, raw
+episodes, checkpoint hashes, and artifact hashes are recorded. Tiny feed-forward and
+recurrent smoke profiles validate the machinery but are explicitly excluded from benchmark
+claims.
