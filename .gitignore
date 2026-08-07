@@ -1,6 +1,10 @@
 # Local planning notes
 *_TECHNICAL_PLAN.md
 docs/
+!docs/
+docs/*
+!docs/stage_7_island_benchmark_v1.md
+!docs/technical_report_progress_notes.md
 .design-reference/
 
 # Python

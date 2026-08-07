@@ -1,81 +1,66 @@
 # Voyager
 
-Voyager is an auditable cooperative multi-agent reinforcement-learning benchmark under
-development, built around a bounded stranded-island economy and paired with a web replay
-viewer. Its central experiment is: under the same interaction budget, which RL algorithm
-can most reliably convert finite, spatially distributed resources into population survival
-and rescue on unseen islands?
+Voyager is a two-agent reinforcement-learning benchmark for cooperative capability
+acquisition in a finite stranded-island economy. It asks whether a learning method can train
+a decentralized pair to explore, gather, return resources, build public infrastructure,
+survive repeated nights, and complete a rescue signal on unseen islands.
 
-Stage 5.6 validates three frozen two-million-agent-step TensorFlow PPO policies on 100 held-out seeds each. Across the 300 official deterministic PPO episodes, every run retained 10/10 survivors and completed the shelter. The hierarchical-bootstrap civilization score is 89.42 (95% CI 84.19-93.17). Stage 6 turns those trajectories into a versioned saved-replay platform and a game-like web viewer.
+The canonical `VoyagerIsland-v1` contract deliberately keeps the research task smaller than
+the underlying game engine:
 
-Stage 7A expands that same simulator into a deterministic 48×48 handcrafted island without
-removing the compact benchmark. `VoyagerCivilization-v1` adds structured actions, a
-workbench-to-spear-to-hunt-to-cooking progression, joint construction, a fueled campfire,
-six-person shelter occupancy, and one-or-two seeded night stalkers whose 25-damage attacks
-can be mitigated or suppressed through coordinated defense. The committed Replay 2.1
-vertical slice runs for 600 ticks at two ticks per second.
+- Two symmetric agents sharing one policy.
+- Deterministic simultaneous actions and conflict resolution.
+- A 48×48 island with a 1,200-tick, four-night horizon.
+- A fixed nineteen-action categorical interface and 373-value structured actor input.
+- Finite food, wood, stone, deer, camp storage, two tools, four public structures, and one or
+  two dangerous night stalkers.
+- Fifteen outcome achievements and a reward-independent geometric-mean evaluation score.
+- Frozen train, development, and held-out test seed manifests.
+- Legal-random, public-observation scripted-oracle, feed-forward PPO, and recurrent PPO
+  baseline paths.
+- Replay 2.3 recording through the existing web viewer and conservation ledger.
 
-Stage 7B keeps that same island and shared simulation engine. `VoyagerCivilization-v2`
-adds deterministic intent resolution, targeted local entity slots, five owned tools,
-food-lot provenance and spoilage, ground piles, structure damage and repair, downing and
-revival, and an append-only conservation/contribution ledger. Replay 2.2 records those
-facts without changing the Stage 7A replay or `VoyagerCivilization-v1` contract.
-
-The first Stage 7C trainability probe completed two million transitions and failed: PPO
-learned no production capability and scored below legal-random play. That result is kept as
-`civilization_trainability_probe_v1`. Its 250K v2 remediation also failed after discovering
-a bounded but dominant stone-mining strategy. V3 caps all gathering and delivery credit at
-the workbench requirements, assigns valid-action credit and conflict penalties per agent,
-adds a nonprivileged camp bearing, and records deterministic plus seeded-stochastic
-evaluation. Procedural generation remains gated on a successful trainability result.
-The v3 250K pilot also failed: sampled PPO learned useful gathering and lower-conflict
-behavior but never delivered stone or began construction, while argmax inference collapsed
-mostly to no-op. Stage 7C therefore uses an isolated learning ladder before any longer run:
-delivery, pre-stocked workbench construction, and first-night survival are trained as
-separate policies over the same v2 mechanics.
-
-The first full learning-ladder run localized the failure: construction passed at 100%
-with workbench completion by tick 5, survival met its deliberately lenient diagnostic bar,
-and delivery remained at 0%. Delivery traces showed gathering without any return to camp.
-The next gate splits delivery into wood acquisition, stone acquisition, and return of
-pre-carried materials before any curriculum or observation change is selected.
-
-The delivery-component run then showed that the primitive capabilities are learnable.
-Sampled PPO raised wood success from random's 25% to 55%, learned a faster directed stone
-policy, and completed return-to-camp on 100% of episodes versus random's 0%. Its remaining
-invalid actions were simultaneous movement collisions. The corrected diagnosis is therefore
-skill composition/team-state failure, not inability to navigate home. These presets remain
-diagnostic tools rather than the official benchmark training distribution.
-
-Stage 7C now replaces the failed all-or-nothing probe gate with
-`civilization_achievement_benchmark_v1` on the unchanged 600-tick island. It reports fifteen
-population achievement rates spanning gathering, delivery, workbench progression, tool
-sharing, and first-night/terminal survival, then aggregates them with a smoothed geometric
-mean. Legal random, the existing feed-forward PPO checkpoint, and recurrent PPO use the same
-seeds and scorer. Seeded-stochastic inference is primary because it evaluates the categorical
-policy PPO trained; deterministic argmax is retained as a synchronization-collapse
-diagnostic. Procedural islands and new game content remain blocked until at least one learned
-baseline exceeds random on both the aggregate score and meaningful progression achievements.
+The older `VoyagerCivilization-v1` and `VoyagerCivilization-v2` environments remain supported
+advanced sandboxes over the same simulation. Their ten-agent population, 270-action targeted
+interface, spoilage, transfers, repair, and revival are not part of the official v1 benchmark.
+The failed Stage 7C experiments on that broader interface remain documented as evidence for
+why the benchmark was narrowed rather than silently discarded.
 
 ## Why This Exists
 
-Voyager is intended to compare learning methods for decentralized planning, resource
-allocation, public investment, recovery, memory, and cooperative credit assignment. Ten
-agents must acquire a compact production chain, physically redistribute private tools and
-food, build shared infrastructure, survive repeated nights, and maintain a rescue beacon.
-Deterministic simultaneous resolution and an append-only provenance ledger make resource
-flows and claimed cooperation auditable.
+Voyager is intended to compare learning methods for decentralized exploration, temporal
+composition, shared resource allocation, public investment, memory, and cooperative credit
+assignment. Its evaluation reports every semantic achievement before aggregating them, so a
+method cannot hide a missing capability behind one dense return.
 
-The planned public benchmark, `VoyagerCollective-v1`, uses a procedural 48x48 island,
-2,400 world ticks across eight day/night cycles, local structured observations, one shared
-reward contract, eighteen outcome achievements, and held-out island seeds. The current
-Stage 7A/7B implementation is a strong deterministic substrate, not yet a validated
-benchmark: Stage 7C-7F must still demonstrate learnability, solvability, cooperation
-dependence, closed-loop control, generalization, algorithm headroom, and practical compute.
-The full design and its failure gates are in
-[`docs/stage_7_civilization_benchmark_plan.md`](docs/stage_7_civilization_benchmark_plan.md).
+The environment is implemented, deterministic, procedurally seeded, replayable, and wired to
+the existing PPO trainers. A seed-0 fixed-island 250K run now establishes early-economy
+separation from legal random, but this is not yet a scientifically validated benchmark result:
+the predeclared multi-seed procedural baselines must still demonstrate generalization and
+late-game capability. The frozen contract and remaining acceptance gates are in
+[`docs/stage_7_island_benchmark_v1.md`](docs/stage_7_island_benchmark_v1.md).
 
 ## Python API
+
+Canonical multi-agent benchmark:
+
+```python
+from voyager.envs import VoyagerIslandEnv
+
+env = VoyagerIslandEnv(procedural=True)
+observations, infos = env.reset(seed=0)
+
+while env.agents:
+    actions = {
+        agent_id: env.action_space(agent_id).sample(mask=infos[agent_id]["action_mask"])
+        for agent_id in env.agents
+    }
+    observations, rewards, terminations, truncations, infos = env.step(actions)
+```
+
+The canonical interface follows PettingZoo's parallel API. `gym.make("VoyagerIsland-v1")`
+registers the same environment, while `VoyagerIslandCentralized-v1` is an optional
+Gymnasium wrapper for a controller that emits both actions.
 
 Gymnasium-style single-agent prototype:
 
@@ -122,7 +107,7 @@ The multi-agent environment supports seeded reset/step loops, roles, shared map 
 - Stage 5.5: Action masking, entropy decay, economy/group reward shaping, and three reference training runs. Complete.
 - Stage 5.6: Held-out seeds, achievement success rates, civilization score, benchmark exports, and ablation support. Complete.
 - Stage 6: Versioned recorder, random-access loader, API, curated run library, comparison, presentation mode, and interactive pixel-art viewer. Complete.
-- Stage 7: Complete `VoyagerCollective-v1`: deterministic cooperative economy, trainability gate, procedural islands, fishing and rescue, PPO/recurrent PPO/MAPPO baselines, frozen evaluation, and final replay presentation.
+- Stage 7: Complete `VoyagerIsland-v1`: two-agent deterministic economy, compact public API, fixed-island trainability gate, procedural seed splits, rescue, PPO/recurrent PPO baselines, frozen evaluation, and Replay 2.3 presentation.
 - Stage 8: Optional research extensions such as pixels, communication, mixed incentives, variable populations, additional algorithms, or accelerated backends.
 - Stage 9: Public research release, reproducibility package, benchmark tables, report, and polished replay showcase. Voyager may be called complete here.
 - Stage 10: Optional LLM interface only if a concrete later use case justifies it.
@@ -194,138 +179,51 @@ When a PPO checkpoint is provided, evaluation always prints separate `ppo_determ
 
 `--total-steps` counts agent transitions, not only world ticks. With `10` agents and `128` rollout steps, one PPO update collects up to `1280` training samples. Entropy decays linearly across those agent transitions from `--entropy-coef-start` to `--entropy-coef-end`.
 
-Run the Stage 7C isolated learning ladder after the failed v3 pilot:
+Run the reduced Stage 7 fixed-island trainability gate:
 
 ```bash
-.venv-train/bin/python examples/run_stage7c_learning_ladder.py \
-  --tasks all \
+.venv-train/bin/python examples/run_stage7_island_fixed_gate.py \
+  --total-agent-transitions 250000 \
   --seed 0 \
+  --dev-episodes 10 \
   --eval-episodes 20 \
-  --delivery-transitions 100000 \
-  --construction-transitions 50000 \
-  --survival-transitions 100000 \
-  --output-dir results/stage7c/learning_ladder_v1_seed0
+  --evaluation-milestones 50000 100000 150000 200000 250000 \
+  --output-dir results/stage7/island_progression_v4_250k_seed0
 ```
 
-This is a diagnostic, not an official benchmark score. Each task trains a fresh policy,
-compares seeded-stochastic behavior with legal random, records deterministic behavior as a
-secondary diagnostic, and emits the first likely failure class. Do not resume the full
-probe or procedural generation until these isolated tests locate the bottleneck.
+This trains shared feed-forward PPO on `VoyagerIsland-v1`, evaluates stochastic and
+deterministic inference at fixed milestones on development seeds, selects by stochastic
+achievement score with invalid-action rate as its tie-breaker, and applies the predeclared
+gate once to that locked checkpoint on held-out test seeds. The final checkpoint is also
+reported as a collapse diagnostic but cannot replace the development-selected checkpoint.
+Do not begin the longer procedural baseline runs if this gate fails. The runner uses the bounded
+`voyager_island_progression_reward_v4` contract while public evaluation remains entirely
+achievement-based. V4 preserves the 48x48 island and nineteen-action interface, but exposes
+one technology branch at a time, reduces construction cost, rewards only currently useful
+deposits and applied labor, and turns beacon completion into a 100-tick extraction window.
+The original v1 reward gate failed because PPO learned wood gathering but not stone,
+returning, delivery, or construction; its artifact remains preserved at
+`results/stage7/island_fixed_gate_seed0`. The earlier ten-agent
+Stage 7C diagnostic commands and results remain in the historical Stage 7 documentation;
+they are not part of the canonical benchmark workflow.
 
-Run the focused delivery components without repeating construction and survival:
+The verified seed-0 run selects its 200K checkpoint and passes the held-out gate: achievement
+score `0.122` versus legal random `0.019`, wood/stone delivery `70%/75%`, workbench completion
+`50%`, and first-night achievement `90%`. This validates early-economy trainability, not
+complete-game mastery.
+
+Evaluate the public-observation safety oracle on the frozen held-out split:
 
 ```bash
-.venv-train/bin/python examples/run_stage7c_learning_ladder.py \
-  --tasks delivery_diagnostics \
-  --seed 0 \
-  --eval-episodes 20 \
-  --gather-wood-transitions 75000 \
-  --gather-stone-transitions 75000 \
-  --return-to-camp-transitions 75000 \
-  --output-dir results/stage7c/delivery_components_v1_seed0
+.venv-train/bin/python examples/evaluate_stage7_island.py \
+  --policy oracle \
+  --split test \
+  --output results/stage7/island_oracle_test_v1.json
 ```
 
-Re-score legal random and the existing 250K feed-forward checkpoint with the frozen
-achievement spectrum:
-
-```bash
-.venv-train/bin/python examples/evaluate_stage7c_achievements.py \
-  --feed-forward-checkpoint results/stage7c/ppo_probe_v3_250k_seed0/checkpoints/best \
-  --episodes 20 \
-  --seed-start 40000 \
-  --output-dir results/stage7c/achievement_rescore_v1
-```
-
-Then train recurrent PPO directly on the complete environment. This is not a curriculum:
-all ten agents receive their ordinary local 604-value observations, act through the full
-270-action registry, and maintain separate GRU states while sharing one policy network.
-
-```bash
-.venv-train/bin/python examples/run_stage7c_recurrent_ppo.py \
-  --total-agent-transitions 250000 \
-  --seed 0 \
-  --dev-episodes 10 \
-  --test-episodes 20 \
-  --evaluation-milestones 250000 \
-  --output-dir results/stage7c/recurrent_ppo_250k_seed0
-```
-
-The calibration target is `legal random < feed-forward PPO < recurrent PPO` on the
-achievement spectrum. MAPPO is not implemented by default: it is added only if decentralized
-recurrent PPO still cannot establish useful separation. If no learned baseline beats random,
-the next remediation is a minimal public camp-needs vector or factorized action output before
-adding procedural generation, fishing, rescue, or longer episodes.
-
-The first recurrent 250K pilot did not separate: legal random scored `0.139`, feed-forward
-PPO `0.049`, and recurrent PPO `0.022`. Recurrent PPO gathered wood in every held-out episode
-but made no resource deposit, never began the workbench, and ended with only 0.35 active
-agents on average. This rules out memory alone as the immediate fix.
-
-`civilization_trainability_probe_v4` therefore adds a six-value public team-objective board
-to the v3 actor input: cumulative gathered and delivered progress for the workbench's wood
-and stone requirements, workbench progress, and active-population fraction. It exposes no
-resource locations or private inventories. The v1-v3 contracts and checkpoints remain
-unchanged. Run fresh, seed-matched feed-forward and recurrent policies under v4 with:
-
-```bash
-.venv-train/bin/python examples/run_stage7c_team_objective_pilot.py \
-  --transitions-per-policy 250000 \
-  --seed 0 \
-  --dev-episodes 10 \
-  --test-episodes 20 \
-  --output-dir results/stage7c/team_objective_v4_250k_seed0
-```
-
-The v4 evaluator additionally reports action distributions, carried-resource distance and
-homeward movement, camp return opportunities, deposit choices, and deposit conversion. In
-the completed v4 pilot, recurrent PPO learned the complete gathering bundle in every episode
-but neither learned policy returned wood or stone to camp or began the workbench. Recurrent
-PPO also overselected `GIVE` (about 521 times per episode), exposing bias from representing
-each valid `(verb, argument, target)` triple as an unrelated categorical action.
-
-The next controlled baseline keeps the public 270-action registry unchanged but factorizes
-the PPO actor into `verb -> valid argument -> valid target`. PPO trains the sum of the three
-conditional log probabilities as one joint action probability. This shares learning between
-actions with the same verb and prevents verbs with many target combinations from receiving
-extra probability mass solely because they occupy more registry entries. Run the 250K
-feed-forward pilot with:
-
-```bash
-.venv-train/bin/python examples/run_stage7c_factorized_ppo.py \
-  --total-agent-transitions 250000 \
-  --seed 0 \
-  --dev-episodes 10 \
-  --test-episodes 20 \
-  --output-dir results/stage7c/factorized_ppo_v1_250k_seed0
-```
-
-Only if factorized feed-forward PPO exhibits resource-return or deposit behavior should a
-factorized recurrent policy be trained. MAPPO remains blocked until actor representation and
-navigation are no longer the demonstrated failure.
-
-The completed factorized feed-forward pilot improved gathering and removed the duplicated
-target bias, but it did not solve the economy: it scored `0.048` against random's `0.119`,
-assembled the gathered resource bundle in 95% of held-out episodes, deposited one wood in
-only one of twenty episodes, never deposited stone, and never began the workbench. The
-original automatic gate was too permissive because one deposit counted as emergence, and its
-camp-return diagnostic incorrectly used distance zero although Civilization permits camp
-interaction at Manhattan distance one. The corrected gate requires delivery in at least 20%
-of both development and held-out episodes.
-
-One final controlled composition test combines recurrent memory with factorized actions:
-
-```bash
-.venv-train/bin/python examples/run_stage7c_factorized_recurrent_ppo.py \
-  --total-agent-transitions 250000 \
-  --seed 0 \
-  --dev-episodes 10 \
-  --test-episodes 20 \
-  --output-dir results/stage7c/factorized_recurrent_v1_250k_seed0
-```
-
-If this policy establishes repeatable delivery and meaningful achievement separation above
-random, replicate it across training seeds. Otherwise stop adding algorithms and simplify
-the task or agent interface; the runner explicitly does not authorize MAPPO.
+The current oracle passes the solvability gate on all 100 test seeds: every achievement is
+completed on at least 96% of islands, rescue succeeds on 96%, and the achievement geometric
+mean is `0.986`. This is a solvability check, not a learned benchmark result.
 
 ## Stage 5.6 Benchmark
 
@@ -352,13 +250,9 @@ python examples/run_benchmark.py \
 
 The environment also exposes `VoyagerReward-v0`, `VoyagerAchievement-v0`, and `VoyagerNoReward-v0`, plus training flags for action-mask, reward-component, and role-observation ablations.
 
-Stage 7 now targets one fixed eight-cycle, 2,400-tick benchmark rather than a ladder of
-ever-longer campaigns. The compact progression adds one renewable investment, a fishing
-net, and one terminal public project, a rescue beacon. The task should be easy to begin,
-difficult to complete, and calibrated so survival is learnable, majority rescue requires
-the shared economy, and perfect rescue remains exceptional. Feed-forward learning is
-tested before further content is added; recurrent PPO and MAPPO are trained only after
-that gate passes.
+Stage 7's canonical task is the four-cycle, 1,200-tick `VoyagerIsland-v1` contract described
+above. Fishing, renewable ecology, larger populations, and MAPPO are optional extensions,
+not prerequisites for a useful v1 benchmark.
 
 ## Stage 6 Replay Platform
 
@@ -452,6 +346,16 @@ voyager-web
 Then open `/replays/civilization_deterministic_core_v1`. Its Replay 2.2 bundle includes a
 separate `ledger.json.gz` artifact and deeply reconstructable state hashes for all 601
 states (initial state plus 600 ticks).
+
+Generate the canonical reduced Stage 7 benchmark replay with:
+
+```bash
+.venv-train/bin/python examples/generate_stage7_island_replay.py
+voyager-web
+```
+
+Then open `/replays/island_benchmark_oracle_v1`. Replay 2.3 shows the complete two-agent
+achievement chain, night defense, beacon construction, and final rescue from recorded facts.
 
 Build and run the single-process production container:
 

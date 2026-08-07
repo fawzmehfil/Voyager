@@ -1,5 +1,10 @@
 # Stage 7: Voyager Cooperative Planning Benchmark
 
+> Historical design and Stage 7C diagnostic record. The authoritative reduced public
+> benchmark is now [`stage_7_island_benchmark_v1.md`](stage_7_island_benchmark_v1.md).
+> The Civilization v1/v2 environments remain supported advanced sandboxes; the former
+> ten-agent, 2,400-tick proposal below is no longer the release contract.
+
 ## Decision And Status
 
 Stage 7 turns the existing Voyager project into an auditable cooperative multi-agent
@@ -28,8 +33,8 @@ Current implementation status as of 2026-08-04:
 |---|---|---|
 | 7A | Implemented and committed | Handcrafted 48x48 island, ten agents, two days, workbench, campfire, shelter, hunting, cooking, stalkers, Replay 2.1 |
 | 7B | Implemented and committed | Deterministic intent resolution, owned tools, transfers, food lots, spoilage, piles, damage, repair, downing, revival, ledger, Replay 2.2 |
-| 7C trainability slice | Achievement scorer and recurrent PPO implemented; calibration runs pending | Failed probes preserved, primitive capabilities verified, fifteen-achievement handcrafted scorer, feed-forward re-score path, and decentralized shared-GRU PPO |
-| 7C procedural substrate-7G | Blocked on baseline separation | Procedural islands, rescue economy, scaled MARL baselines, frozen benchmark, final viewer |
+| 7C trainability slice | Fixed-island gate passed | Failed probes preserved; reduced two-agent contract now gives clear random < feed-forward PPO separation through tools and early infrastructure |
+| 7C procedural substrate-7G | Not started in this remediation | Procedural calibration, stronger MARL baselines, benchmark freeze, and final viewer remain later work |
 
 Stage 7B is released with a canonical Replay 2.2 demonstration that completes revival
 through public actions. The first Stage 7C run completed 2,000,009 transitions and the v2
