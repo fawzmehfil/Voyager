@@ -13,13 +13,21 @@ from typing import Any
 
 import numpy as np
 
+from voyager.envs.island import ISLAND_REWARD_VERSION
+from voyager.sim.island_achievements import ISLAND_ACHIEVEMENT_VERSION
 from voyager.training.advantages import compute_gae
 from voyager.training.checkpoints import save_policy_checkpoint
 from voyager.training.environments import (
     CIVILIZATION_PROBE_REWARD_CONTRACT,
     CIVILIZATION_PROBE_V4_REWARD_CONTRACT,
     CIVILIZATION_V2_TRAINING_ENVIRONMENT,
+    ISLAND_V1_TRAINING_ENVIRONMENT,
     make_training_environment,
+)
+from voyager.training.island_reward import (
+    ISLAND_TRAINING_REWARD_V2,
+    ISLAND_TRAINING_REWARD_V3,
+    ISLAND_TRAINING_REWARD_V4,
 )
 from voyager.training.masking import stack_action_masks
 from voyager.training.model import build_recurrent_actor_critic, require_tensorflow
@@ -55,6 +63,7 @@ class RecurrentPPOConfig:
     num_agents: int = 10
     map_size: int = 48
     max_steps: int = 600
+    procedural: bool = True
 
     def validate(self) -> None:
         positive_ints = {
@@ -68,15 +77,26 @@ class RecurrentPPOConfig:
         for name, value in positive_ints.items():
             if value <= 0:
                 raise ValueError(f"{name} must be positive.")
-        if self.environment_id != CIVILIZATION_V2_TRAINING_ENVIRONMENT:
-            raise ValueError("Recurrent Stage 7C PPO requires VoyagerCivilization-v2.")
-        if self.reward_contract not in {
-            CIVILIZATION_PROBE_REWARD_CONTRACT,
-            CIVILIZATION_PROBE_V4_REWARD_CONTRACT,
-        }:
-            raise ValueError("Recurrent Stage 7C PPO requires a frozen v3/v4 reward.")
-        if (self.num_agents, self.map_size, self.max_steps) != (10, 48, 600):
-            raise ValueError("Recurrent Stage 7C PPO uses the unchanged 10-agent island.")
+        if self.environment_id == CIVILIZATION_V2_TRAINING_ENVIRONMENT:
+            if self.reward_contract not in {
+                CIVILIZATION_PROBE_REWARD_CONTRACT,
+                CIVILIZATION_PROBE_V4_REWARD_CONTRACT,
+            }:
+                raise ValueError("Recurrent Civilization PPO requires a frozen v3/v4 reward.")
+            if (self.num_agents, self.map_size, self.max_steps) != (10, 48, 600):
+                raise ValueError("Recurrent Civilization PPO uses the unchanged 10-agent island.")
+        elif self.environment_id == ISLAND_V1_TRAINING_ENVIRONMENT:
+            if self.reward_contract not in {
+                ISLAND_REWARD_VERSION,
+                ISLAND_TRAINING_REWARD_V2,
+                ISLAND_TRAINING_REWARD_V3,
+                ISLAND_TRAINING_REWARD_V4,
+            }:
+                raise ValueError("Recurrent island PPO requires a versioned island reward.")
+            if (self.num_agents, self.map_size, self.max_steps) != (2, 48, 1_200):
+                raise ValueError("Recurrent island PPO requires the frozen 2-agent contract.")
+        else:
+            raise ValueError(f"Unsupported recurrent environment: {self.environment_id!r}.")
         if not 0.0 < self.gamma <= 1.0:
             raise ValueError("gamma must be in (0, 1].")
         if not 0.0 <= self.gae_lambda <= 1.0:
@@ -153,9 +173,12 @@ class RecurrentPPOTrainer:
             num_agents=config.num_agents,
             map_size=config.map_size,
             max_steps=config.max_steps,
-            reward_mode="none",
+            reward_mode=(
+                "dense" if config.environment_id == ISLAND_V1_TRAINING_ENVIRONMENT else "none"
+            ),
             disabled_reward_components=(),
             mask_role_observation=False,
+            procedural=config.procedural,
         )
         self.env = training_environment.env
         self.observation_encoder = training_environment.observation_encoder
@@ -203,9 +226,7 @@ class RecurrentPPOTrainer:
         while self.agent_steps < self.config.total_steps:
             update += 1
             rollout_started = time.perf_counter()
-            batch = self.collect_rollout(
-                max_agent_steps=self.config.total_steps - self.agent_steps
-            )
+            batch = self.collect_rollout(max_agent_steps=self.config.total_steps - self.agent_steps)
             rollout_seconds = time.perf_counter() - rollout_started
             entropy_coef = self.config.entropy_coefficient(self.agent_steps)
             update_started = time.perf_counter()
@@ -236,9 +257,7 @@ class RecurrentPPOTrainer:
         self._save_checkpoint(update)
         return stats
 
-    def collect_rollout(
-        self, max_agent_steps: int | None = None
-    ) -> RecurrentRolloutBatch:
+    def collect_rollout(self, max_agent_steps: int | None = None) -> RecurrentRolloutBatch:
         if max_agent_steps is not None and max_agent_steps <= 0:
             raise ValueError("max_agent_steps must be positive when provided.")
         records: list[_StepRecord] = []
@@ -260,9 +279,7 @@ class RecurrentPPOTrainer:
                 agent_ids,
                 self.observation_encoder,
             )
-            self.timing_seconds["observation_encoding"] += (
-                time.perf_counter() - started
-            )
+            self.timing_seconds["observation_encoding"] += time.perf_counter() - started
             started = time.perf_counter()
             action_masks = stack_action_masks(
                 self.infos,
@@ -293,10 +310,7 @@ class RecurrentPPOTrainer:
             final_states_array = np.asarray(final_states, dtype=np.float32)
             self.timing_seconds["actor_inference"] += time.perf_counter() - started
 
-            action_map = {
-                agent_id: int(actions[index])
-                for index, agent_id in enumerate(agent_ids)
-            }
+            action_map = {agent_id: int(actions[index]) for index, agent_id in enumerate(agent_ids)}
             started = time.perf_counter()
             (
                 next_observations,
@@ -314,9 +328,7 @@ class RecurrentPPOTrainer:
                 final_states_array,
                 agent_ids,
             )
-            self.timing_seconds["next_value_inference"] += (
-                time.perf_counter() - started
-            )
+            self.timing_seconds["next_value_inference"] += time.perf_counter() - started
             for index, agent_id in enumerate(agent_ids):
                 done = bool(terminations[agent_id] or truncations[agent_id])
                 records.append(
@@ -335,9 +347,7 @@ class RecurrentPPOTrainer:
                     )
                 )
                 self.recurrent_states[agent_id] = (
-                    np.zeros(
-                        (self.config.recurrent_hidden_size,), dtype=np.float32
-                    )
+                    np.zeros((self.config.recurrent_hidden_size,), dtype=np.float32)
                     if done
                     else final_states_array[index]
                 )
@@ -364,33 +374,19 @@ class RecurrentPPOTrainer:
 
         for _epoch in range(self.config.train_epochs):
             self.rng.shuffle(indices)
-            for start in range(
-                0, sequence_count, self.config.sequence_minibatch_size
-            ):
-                selected = indices[
-                    start : start + self.config.sequence_minibatch_size
-                ]
-                observations = tf.convert_to_tensor(
-                    batch.observations[selected], dtype=tf.float32
-                )
+            for start in range(0, sequence_count, self.config.sequence_minibatch_size):
+                selected = indices[start : start + self.config.sequence_minibatch_size]
+                observations = tf.convert_to_tensor(batch.observations[selected], dtype=tf.float32)
                 initial_states = tf.convert_to_tensor(
                     batch.initial_states[selected], dtype=tf.float32
                 )
-                action_masks = tf.convert_to_tensor(
-                    batch.action_masks[selected], dtype=tf.bool
-                )
-                actions = tf.convert_to_tensor(
-                    batch.actions[selected], dtype=tf.int32
-                )
+                action_masks = tf.convert_to_tensor(batch.action_masks[selected], dtype=tf.bool)
+                actions = tf.convert_to_tensor(batch.actions[selected], dtype=tf.int32)
                 old_log_probs = tf.convert_to_tensor(
                     batch.old_log_probs[selected], dtype=tf.float32
                 )
-                advantages = tf.convert_to_tensor(
-                    batch.advantages[selected], dtype=tf.float32
-                )
-                returns = tf.convert_to_tensor(
-                    batch.returns[selected], dtype=tf.float32
-                )
+                advantages = tf.convert_to_tensor(batch.advantages[selected], dtype=tf.float32)
+                returns = tf.convert_to_tensor(batch.returns[selected], dtype=tf.float32)
                 valid = tf.convert_to_tensor(batch.valid[selected], dtype=tf.float32)
                 denominator = tf.maximum(tf.reduce_sum(valid), 1.0)
 
@@ -403,31 +399,26 @@ class RecurrentPPOTrainer:
                     log_probs = self._selected_log_probs(masked_logits, actions)
                     ratio = tf.exp(log_probs - old_log_probs)
                     unclipped = ratio * advantages
-                    clipped = tf.clip_by_value(
-                        ratio,
-                        1.0 - self.config.clip_ratio,
-                        1.0 + self.config.clip_ratio,
-                    ) * advantages
-                    policy_loss = -tf.reduce_sum(
-                        tf.minimum(unclipped, clipped) * valid
-                    ) / denominator
-                    value_loss = tf.reduce_sum(
-                        tf.square(returns - values) * valid
-                    ) / denominator
+                    clipped = (
+                        tf.clip_by_value(
+                            ratio,
+                            1.0 - self.config.clip_ratio,
+                            1.0 + self.config.clip_ratio,
+                        )
+                        * advantages
+                    )
+                    policy_loss = (
+                        -tf.reduce_sum(tf.minimum(unclipped, clipped) * valid) / denominator
+                    )
+                    value_loss = tf.reduce_sum(tf.square(returns - values) * valid) / denominator
                     entropy_by_step = self._entropy_by_step(masked_logits)
                     entropy = tf.reduce_sum(entropy_by_step * valid) / denominator
                     total_loss = (
-                        policy_loss
-                        + self.config.value_coef * value_loss
-                        - entropy_coef * entropy
+                        policy_loss + self.config.value_coef * value_loss - entropy_coef * entropy
                     )
 
                 gradients = tape.gradient(total_loss, self.model.trainable_variables)
-                finite_gradients = [
-                    gradient
-                    for gradient in gradients
-                    if gradient is not None
-                ]
+                finite_gradients = [gradient for gradient in gradients if gradient is not None]
                 clipped_gradients, _norm = tf.clip_by_global_norm(
                     finite_gradients,
                     self.config.max_gradient_norm,
@@ -476,9 +467,7 @@ class RecurrentPPOTrainer:
             "world_steps": self.world_steps,
             "measured_seconds": measured_seconds,
             "agent_steps_per_second": agent_steps_per_second,
-            "projected_five_million_hours": 5_000_000
-            / max(agent_steps_per_second, 1e-9)
-            / 3_600,
+            "projected_five_million_hours": 5_000_000 / max(agent_steps_per_second, 1e-9) / 3_600,
             "components_seconds": dict(self.timing_seconds),
             "environment_detail_seconds": dict(environment_detail),
         }
@@ -493,15 +482,11 @@ class RecurrentPPOTrainer:
                 rewards=np.asarray([row.reward for row in stream], dtype=np.float32),
                 dones=np.asarray([row.done for row in stream], dtype=np.float32),
                 values=np.asarray([row.value for row in stream], dtype=np.float32),
-                next_values=np.asarray(
-                    [row.next_value for row in stream], dtype=np.float32
-                ),
+                next_values=np.asarray([row.next_value for row in stream], dtype=np.float32),
                 gamma=self.config.gamma,
                 gae_lambda=self.config.gae_lambda,
             )
-            for row, advantage, return_value in zip(
-                stream, advantages, returns, strict=True
-            ):
+            for row, advantage, return_value in zip(stream, advantages, returns, strict=True):
                 row.advantage = float(advantage)
                 row.return_value = float(return_value)
                 all_advantages.append(float(advantage))
@@ -524,12 +509,8 @@ class RecurrentPPOTrainer:
         count = len(chunks)
         length = self.config.sequence_length
         observations = np.zeros((count, length, self.input_dim), dtype=np.float32)
-        initial_states = np.zeros(
-            (count, self.config.recurrent_hidden_size), dtype=np.float32
-        )
-        action_masks = np.zeros(
-            (count, length, self.action_count), dtype=np.bool_
-        )
+        initial_states = np.zeros((count, self.config.recurrent_hidden_size), dtype=np.float32)
+        action_masks = np.zeros((count, length, self.action_count), dtype=np.bool_)
         action_masks[:, :, 0] = True
         actions = np.zeros((count, length), dtype=np.int32)
         old_log_probs = np.zeros((count, length), dtype=np.float32)
@@ -569,8 +550,7 @@ class RecurrentPPOTrainer:
         if not observations:
             return {}
         state_by_agent = {
-            agent_id: final_states[index]
-            for index, agent_id in enumerate(prior_agent_ids)
+            agent_id: final_states[index] for index, agent_id in enumerate(prior_agent_ids)
         }
         agent_ids = tuple(observations)
         flat = flatten_observations(
@@ -578,17 +558,12 @@ class RecurrentPPOTrainer:
             agent_ids,
             self.observation_encoder,
         )
-        initial_states = np.stack(
-            [state_by_agent[agent_id] for agent_id in agent_ids], axis=0
-        )
+        initial_states = np.stack([state_by_agent[agent_id] for agent_id in agent_ids], axis=0)
         _logits, values, _discarded_states = self.model(
             [flat[:, None, :], initial_states], training=False
         )
         values_array = np.asarray(values, dtype=np.float32)[:, 0, 0]
-        return {
-            agent_id: float(values_array[index])
-            for index, agent_id in enumerate(agent_ids)
-        }
+        return {agent_id: float(values_array[index]) for index, agent_id in enumerate(agent_ids)}
 
     def _sample_actions(self, logits: Any) -> np.ndarray:
         sampled = self.tf.random.categorical(logits, num_samples=1)
@@ -596,29 +571,21 @@ class RecurrentPPOTrainer:
 
     def _mask_logits(self, logits: Any, action_masks: Any) -> Any:
         masks = self.tf.cast(action_masks, self.tf.bool)
-        invalid = self.tf.fill(
-            self.tf.shape(logits), self.tf.cast(-1e9, logits.dtype)
-        )
+        invalid = self.tf.fill(self.tf.shape(logits), self.tf.cast(-1e9, logits.dtype))
         return self.tf.where(masks, logits, invalid)
 
     def _selected_log_probs(self, logits: Any, actions: Any) -> Any:
         one_hot = self.tf.one_hot(actions, depth=self.action_count)
-        return self.tf.reduce_sum(
-            one_hot * self.tf.nn.log_softmax(logits), axis=-1
-        )
+        return self.tf.reduce_sum(one_hot * self.tf.nn.log_softmax(logits), axis=-1)
 
     def _entropy_by_step(self, logits: Any) -> Any:
         probabilities = self.tf.nn.softmax(logits)
         log_probabilities = self.tf.nn.log_softmax(logits)
-        return -self.tf.reduce_sum(
-            probabilities * log_probabilities, axis=-1
-        )
+        return -self.tf.reduce_sum(probabilities * log_probabilities, axis=-1)
 
     def _zero_states(self) -> dict[str, np.ndarray]:
         return {
-            agent_id: np.zeros(
-                (self.config.recurrent_hidden_size,), dtype=np.float32
-            )
+            agent_id: np.zeros((self.config.recurrent_hidden_size,), dtype=np.float32)
             for agent_id in self.env.possible_agents
         }
 
@@ -644,13 +611,8 @@ class RecurrentPPOTrainer:
         root = Path(self.config.checkpoint_dir)
         metadata = self._checkpoint_metadata(update)
         latest = save_policy_checkpoint(self.model, root / "latest", metadata)
-        if (
-            self.config.checkpoint_every > 0
-            and update % self.config.checkpoint_every == 0
-        ):
-            save_policy_checkpoint(
-                self.model, root / f"update_{update:05d}", metadata
-            )
+        if self.config.checkpoint_every > 0 and update % self.config.checkpoint_every == 0:
+            save_policy_checkpoint(self.model, root / f"update_{update:05d}", metadata)
         return str(latest)
 
     def _checkpoint_metadata(self, update: int) -> dict[str, object]:
@@ -687,7 +649,11 @@ class RecurrentPPOTrainer:
             "entropy_coef_end": self.config.entropy_coef_end,
             "max_gradient_norm": self.config.max_gradient_norm,
             **self.contract_versions,
-            "achievement_benchmark_version": "civilization_achievement_benchmark_v1",
+            "achievement_benchmark_version": (
+                ISLAND_ACHIEVEMENT_VERSION
+                if self.config.environment_id == ISLAND_V1_TRAINING_ENVIRONMENT
+                else "civilization_achievement_benchmark_v1"
+            ),
             "timing_seconds": dict(self.timing_seconds),
             "python_version": platform.python_version(),
             "tensorflow_version": self.tf.__version__,

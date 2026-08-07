@@ -18,6 +18,7 @@ CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER = (
 CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_ENCODER = (
     "civilization_v4_team_objective_flat_v4"
 )
+ISLAND_V1_OBSERVATION_ENCODER = "voyager_island_observation_flat_v1"
 
 OBSERVATION_KEYS = ("local_view", "stats", "inventory", "role", "camp", "progress")
 CIVILIZATION_V2_OBSERVATION_KEYS = (
@@ -44,6 +45,15 @@ CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_KEYS = (
     *CIVILIZATION_V3_NAVIGATION_OBSERVATION_KEYS,
     "team_objective",
 )
+ISLAND_V1_OBSERVATION_KEYS = (
+    "local_tiles",
+    "self_state",
+    "inventory",
+    "tools",
+    "identity",
+    "camp_bearing",
+    "public_board",
+)
 
 
 def flatten_observation(
@@ -51,6 +61,9 @@ def flatten_observation(
     encoder_id: str = COMPACT_OBSERVATION_ENCODER,
 ) -> np.ndarray:
     """Convert a Voyager dict observation into one normalized float32 vector."""
+
+    if encoder_id == ISLAND_V1_OBSERVATION_ENCODER:
+        return _flatten_island_observation(observation)
 
     if encoder_id in {
         CIVILIZATION_V2_OBSERVATION_ENCODER,
@@ -112,12 +125,15 @@ def flat_observation_size(
         keys = CIVILIZATION_V3_NAVIGATION_OBSERVATION_KEYS
     elif encoder_id == CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_ENCODER:
         keys = CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_KEYS
+    elif encoder_id == ISLAND_V1_OBSERVATION_ENCODER:
+        keys = ISLAND_V1_OBSERVATION_KEYS
     if encoder_id not in {
         COMPACT_OBSERVATION_ENCODER,
         CIVILIZATION_V2_OBSERVATION_ENCODER,
         CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER,
         CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER,
         CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_ENCODER,
+        ISLAND_V1_OBSERVATION_ENCODER,
     }:
         raise ValueError(f"Unknown observation encoder: {encoder_id!r}.")
     size = 0
@@ -172,4 +188,34 @@ def _flatten_civilization_v2_observation(
     encoded = np.concatenate(parts).astype(np.float32)
     if not np.all(np.isfinite(encoded)):
         raise ValueError("Civilization v2 observation contains non-finite values.")
+    return encoded
+
+
+def _flatten_island_observation(observation: Observation) -> np.ndarray:
+    missing = set(ISLAND_V1_OBSERVATION_KEYS) - set(observation)
+    if missing:
+        raise ValueError("Island observation is missing: " + ", ".join(sorted(missing)))
+    local_tiles = np.asarray(observation["local_tiles"])
+    if local_tiles.shape != (7, 7, 7):
+        raise ValueError("local_tiles must have shape (7, 7, 7).")
+    normalized = local_tiles.astype(np.float32, copy=True)
+    normalized[..., 0] /= max(1, max(int(value) for value in Terrain))
+    normalized[..., 1] /= max(1, max(int(value) for value in Resource))
+    normalized[..., 2] = np.clip(normalized[..., 2] / 15.0, 0.0, 1.0)
+    normalized[..., 3] /= 4.0
+    normalized[..., 4] /= 2.0
+    normalized[..., 5] /= 2.0
+    normalized[..., 6] /= 255.0
+    parts = [np.clip(normalized, 0.0, 1.0).reshape(-1)]
+    for key in ISLAND_V1_OBSERVATION_KEYS[1:]:
+        values = np.asarray(observation[key], dtype=np.float32)
+        values = (
+            np.clip(values, -1.0, 1.0)
+            if key == "camp_bearing"
+            else np.clip(values, 0.0, 1.0)
+        )
+        parts.append(values.reshape(-1))
+    encoded = np.concatenate(parts).astype(np.float32)
+    if not np.all(np.isfinite(encoded)):
+        raise ValueError("Island observation contains non-finite values.")
     return encoded

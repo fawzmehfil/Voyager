@@ -3,6 +3,7 @@
 from voyager.policies.base import Info, Observation, Policy
 from voyager.policies.civilization_scripted import CivilizationScriptedController
 from voyager.policies.heuristics import CooperativePolicy, GreedySurvivalPolicy, RandomPolicy
+from voyager.policies.island_scripted import ScriptedIslandOracle
 from voyager.policies.ppo_policy import TensorFlowPPOPolicy
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     "Observation",
     "Policy",
     "RandomPolicy",
+    "ScriptedIslandOracle",
     "TensorFlowPPOPolicy",
 ]

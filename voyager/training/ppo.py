@@ -54,6 +54,7 @@ class PPOConfig:
     use_action_mask: bool = True
     disabled_reward_components: tuple[str, ...] = ()
     mask_role_observation: bool = False
+    procedural: bool = True
 
     def validate(self) -> None:
         """Validate numeric config values before creating a trainer."""
@@ -153,6 +154,7 @@ class PPOTrainer:
             reward_mode=config.reward_mode,
             disabled_reward_components=config.disabled_reward_components,
             mask_role_observation=config.mask_role_observation,
+            procedural=config.procedural,
         )
         self.env = training_environment.env
         self.observation_encoder = training_environment.observation_encoder

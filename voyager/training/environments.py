@@ -8,9 +8,23 @@ from typing import Any
 from voyager.envs import (
     CivilizationV2FlattenedActionWrapper,
     VoyagerCivilizationV2Env,
+    VoyagerIslandEnv,
     VoyagerParallelEnv,
 )
-from voyager.sim.scenarios import CIVILIZATION_MAP_SIZE, CIVILIZATION_MAX_STEPS
+from voyager.envs.island import (
+    ISLAND_ENVIRONMENT_VERSION,
+    ISLAND_OBSERVATION_VERSION,
+    ISLAND_REWARD_VERSION,
+)
+from voyager.sim.island_achievements import ISLAND_ACHIEVEMENT_VERSION
+from voyager.sim.island_registry import ISLAND_ACTION_VERSION
+from voyager.sim.scenarios import (
+    CIVILIZATION_MAP_SIZE,
+    CIVILIZATION_MAX_STEPS,
+    ISLAND_BENCHMARK_MAP_SIZE,
+    ISLAND_BENCHMARK_MAX_STEPS,
+    ISLAND_BENCHMARK_SCENARIO_ID,
+)
 from voyager.training.civilization_learning_ladder import (
     CONTRACT_TO_LEARNING_TASK,
     LEARNING_TASK_CONTRACTS,
@@ -24,12 +38,21 @@ from voyager.training.civilization_probe import (
     PROBE_REWARD_VERSION,
     CivilizationProbeRewardWrapper,
 )
+from voyager.training.island_reward import (
+    ISLAND_TRAINING_REWARD_V2,
+    ISLAND_TRAINING_REWARD_V3,
+    ISLAND_TRAINING_REWARD_V4,
+    IslandTrainingRewardV2Wrapper,
+    IslandTrainingRewardV3Wrapper,
+    IslandTrainingRewardV4Wrapper,
+)
 from voyager.training.obs import (
     CIVILIZATION_V2_IDENTITY_OBSERVATION_ENCODER,
     CIVILIZATION_V2_OBSERVATION_ENCODER,
     CIVILIZATION_V3_NAVIGATION_OBSERVATION_ENCODER,
     CIVILIZATION_V4_TEAM_OBJECTIVE_OBSERVATION_ENCODER,
     COMPACT_OBSERVATION_ENCODER,
+    ISLAND_V1_OBSERVATION_ENCODER,
 )
 from voyager.versions import (
     ACHIEVEMENT_VERSION,
@@ -42,6 +65,7 @@ from voyager.versions import (
 
 COMPACT_TRAINING_ENVIRONMENT = "VoyagerSurvival-v0"
 CIVILIZATION_V2_TRAINING_ENVIRONMENT = "VoyagerCivilization-v2"
+ISLAND_V1_TRAINING_ENVIRONMENT = "VoyagerIsland-v1"
 ENVIRONMENT_REWARD_CONTRACT = "environment"
 CIVILIZATION_PROBE_REWARD_CONTRACT = PROBE_REWARD_VERSION
 CIVILIZATION_PROBE_V4_REWARD_CONTRACT = PROBE_REWARD_V4
@@ -72,8 +96,51 @@ def make_training_environment(
     reward_mode: str,
     disabled_reward_components: tuple[str, ...],
     mask_role_observation: bool,
+    procedural: bool = True,
 ) -> TrainingEnvironment:
     """Construct one supported PPO environment without changing legacy defaults."""
+
+    if environment_id == ISLAND_V1_TRAINING_ENVIRONMENT:
+        if reward_contract not in {
+            ISLAND_REWARD_VERSION,
+            ISLAND_TRAINING_REWARD_V2,
+            ISLAND_TRAINING_REWARD_V3,
+            ISLAND_TRAINING_REWARD_V4,
+        }:
+            raise ValueError("VoyagerIsland-v1 requires a versioned island reward contract.")
+        base = VoyagerIslandEnv(procedural=procedural, reward_mode=reward_mode)
+        if reward_contract == ISLAND_TRAINING_REWARD_V4:
+            env = IslandTrainingRewardV4Wrapper(base)
+        elif reward_contract == ISLAND_TRAINING_REWARD_V3:
+            env = IslandTrainingRewardV3Wrapper(base)
+        elif reward_contract == ISLAND_TRAINING_REWARD_V2:
+            env = IslandTrainingRewardV2Wrapper(base)
+        else:
+            env = base
+        return TrainingEnvironment(
+            env=env,
+            observation_encoder=ISLAND_V1_OBSERVATION_ENCODER,
+            num_agents=2,
+            map_size=ISLAND_BENCHMARK_MAP_SIZE,
+            max_steps=ISLAND_BENCHMARK_MAX_STEPS,
+            versions={
+                "environment_version": ISLAND_ENVIRONMENT_VERSION,
+                "reward_version": reward_contract,
+                "observation_version": ISLAND_OBSERVATION_VERSION,
+                "action_version": ISLAND_ACTION_VERSION,
+                "achievement_version": ISLAND_ACHIEVEMENT_VERSION,
+                "scenario_version": ISLAND_BENCHMARK_SCENARIO_ID,
+                "training_revision": (
+                    "7-island-progression-v4"
+                    if reward_contract == ISLAND_TRAINING_REWARD_V4
+                    else "7-island-progression-v3"
+                    if reward_contract == ISLAND_TRAINING_REWARD_V3
+                    else "7-island-trainability-v2"
+                    if reward_contract == ISLAND_TRAINING_REWARD_V2
+                    else "7C-R-island-v1"
+                ),
+            },
+        )
 
     if environment_id == COMPACT_TRAINING_ENVIRONMENT:
         if reward_contract != ENVIRONMENT_REWARD_CONTRACT:
@@ -186,11 +253,7 @@ def make_training_environment(
                     else (
                         "7C-trainability-v3"
                         if is_v3_probe
-                        else (
-                            "7C-trainability-v2"
-                            if is_identity_probe
-                            else "7C-trainability-v1"
-                        )
+                        else ("7C-trainability-v2" if is_identity_probe else "7C-trainability-v1")
                     )
                 ),
             },
