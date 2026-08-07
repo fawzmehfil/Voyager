@@ -23,6 +23,21 @@ const TILE_SIZE = 48;
 const ART_SCALE = 3;
 const OCEAN_APRON_TILES = 18;
 const ACHIEVEMENT_LABELS: Record<string, string> = {
+  collect_food: "FOOD FOUND",
+  collect_wood: "WOOD GATHERED",
+  collect_stone: "STONE GATHERED",
+  deposit_wood: "WOOD DELIVERED",
+  deposit_stone: "STONE DELIVERED",
+  build_workbench: "WORKBENCH COMPLETE",
+  craft_axe: "AXE CRAFTED",
+  craft_spear: "SPEAR CRAFTED",
+  hunt_deer: "FIRST HUNT",
+  build_campfire: "CAMPFIRE COMPLETE",
+  cook_meat: "FIRST COOKED MEAL",
+  build_shelter: "SHELTER COMPLETE",
+  both_survive_first_night: "FIRST NIGHT SURVIVED",
+  build_beacon: "RESCUE BEACON COMPLETE",
+  rescue_both: "BOTH SURVIVORS RESCUED",
   shelter_25_percent: "SHELTER FRAME RAISED",
   shelter_50_percent: "SHELTER HALF BUILT",
   shelter_complete: "SHELTER COMPLETE!",
@@ -479,7 +494,14 @@ export class ReplayScene extends Phaser.Scene {
       if (structure.type === "shelter") return;
       let visual = this.structureVisuals.get(structure.id);
       if (!visual) {
-        const color = structure.type === "campfire" ? 0xf6a53b : 0x8d5b35;
+        const color =
+          structure.type === "campfire"
+            ? 0xf6a53b
+            : structure.type === "beacon"
+              ? 0x4fc3f7
+              : structure.type === "workbench"
+                ? 0x9b6a43
+                : 0x8d5b35;
         const marker = this.add.rectangle(0, 0, 28, 22, color, 0.95).setStrokeStyle(3, 0x2b2118);
         const label = this.add.text(0, -22, structure.type.toUpperCase(), {
           fontFamily: '"IBM Plex Mono"', fontSize: "10px", color: "#fff3d2",

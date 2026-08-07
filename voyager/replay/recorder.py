@@ -762,11 +762,18 @@ def _world_snapshot(env: VoyagerParallelEnv) -> dict[str, Any]:
     ]
     payload["ledger"] = list(state.ledger)
     payload["conservation"] = env.world.reconcile_v2_ledger()
-    payload["extensions"] = {
-        **payload["extensions"],
-        "civilization_interface": 2,
-        "spoiled_resources": dict(sorted(state.spoiled_resources.items())),
-    }
+    if getattr(env.world, "island_benchmark", False):
+        payload["extensions"] = {
+            **payload["extensions"],
+            "island_interface": 1,
+            "rescue_success": bool(state.rescue_success),
+        }
+    else:
+        payload["extensions"] = {
+            **payload["extensions"],
+            "civilization_interface": 2,
+            "spoiled_resources": dict(sorted(state.spoiled_resources.items())),
+        }
     return payload
 
 

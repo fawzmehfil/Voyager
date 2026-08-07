@@ -7,6 +7,7 @@ from voyager.replay.exporter import (
     LOCKED_POLICY_ID,
     export_vertical_slice,
 )
+from voyager.replay.island import record_island_oracle_replay
 from voyager.replay.loader import ReplayLoader
 from voyager.replay.recorder import (
     ReplayRecorder,
@@ -28,4 +29,5 @@ __all__ = [
     "record_checkpoint_episode",
     "record_civilization_vertical_slice",
     "record_episode",
+    "record_island_oracle_replay",
 ]

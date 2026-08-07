@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 REPLAY_SCHEMA_VERSION = "stage6_replay_2.0.0"
 CIVILIZATION_REPLAY_SCHEMA_VERSION = "stage7_replay_2.1.0"
 DETERMINISTIC_CORE_REPLAY_SCHEMA_VERSION = "stage7_replay_2.2.0"
+ISLAND_REPLAY_SCHEMA_VERSION = "stage7_replay_2.3.0"
 LEGACY_REPLAY_SCHEMA_VERSION = "stage6_replay_1.0.0"
 TIMELINE_CHUNK_SIZE = 100
 SNAPSHOT_INTERVAL = 25

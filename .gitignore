@@ -26,6 +26,8 @@ runs/*
 runs/replays/*
 !runs/replays/civilization_deterministic_core_v1/
 !runs/replays/civilization_deterministic_core_v1/**
+!runs/replays/island_benchmark_oracle_v1/
+!runs/replays/island_benchmark_oracle_v1/**
 logs/
 checkpoints/
 *.ckpt

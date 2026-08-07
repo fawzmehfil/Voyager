@@ -1,0 +1,112 @@
+{
+  "cues": [
+    {
+      "end_tick": 24,
+      "kind": "overview",
+      "label": "The island",
+      "start_tick": 0,
+      "target": {
+        "x": 24.0,
+        "y": 31.5
+      },
+      "zoom": 0.66
+    },
+    {
+      "end_tick": 48,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 25,
+      "target": {
+        "x": 24,
+        "y": 31
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 75,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 49,
+      "target": {
+        "x": 24,
+        "y": 31
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 104,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 76,
+      "target": {
+        "x": 24,
+        "y": 31
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 132,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 105,
+      "target": {
+        "x": 24,
+        "y": 31
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 160,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 133,
+      "target": {
+        "x": 24,
+        "y": 31
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 185,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 161,
+      "target": {
+        "x": 24,
+        "y": 31
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 221,
+      "importance": 38,
+      "kind": "event",
+      "label": "Gather",
+      "start_tick": 186,
+      "target": {
+        "x": 24,
+        "y": 31
+      },
+      "zoom": 1.0
+    },
+    {
+      "end_tick": 300,
+      "kind": "finale",
+      "label": "The survivors",
+      "start_tick": 276,
+      "target": {
+        "x": 24,
+        "y": 31
+      },
+      "zoom": 0.72
+    }
+  ],
+  "mode": "automatic",
+  "version": "camera_director_1.0.0"
+}
