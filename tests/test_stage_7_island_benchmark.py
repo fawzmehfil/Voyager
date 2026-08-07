@@ -377,11 +377,15 @@ def test_scripted_oracle_gate_requires_every_achievement() -> None:
         },
         "rescue_rate": 0.90,
         "invalid_action_rate": 0.0,
+        "ledger_reconciliation_rate": 1.0,
     }
     assert scripted_oracle_solvability_gate(summary)["passed"] is True
     rates = summary["achievement_success_rates"]
     assert isinstance(rates, dict)
     rates["cook_meat"] = 0.89
+    assert scripted_oracle_solvability_gate(summary)["passed"] is False
+    rates["cook_meat"] = 0.90
+    summary["ledger_reconciliation_rate"] = 0.99
     assert scripted_oracle_solvability_gate(summary)["passed"] is False
 
 

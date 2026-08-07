@@ -53,6 +53,7 @@ class IslandEpisodeResult:
     action_counts: dict[str, int]
     action_counts_by_agent: dict[str, dict[str, int]]
     carrier_diagnostics: dict[str, dict[str, int | None]]
+    conservation_errors: dict[str, int]
 
     def as_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -152,27 +153,18 @@ class FeedForwardCheckpointIslandPolicy(FeedForwardModelIslandPolicy):
 
 
 @dataclass(slots=True)
-class RecurrentCheckpointIslandPolicy:
-    """Run a saved shared recurrent PPO actor with one state per agent."""
+class RecurrentModelIslandPolicy:
+    """Run an in-memory shared recurrent PPO actor with one state per agent."""
 
-    checkpoint: str | Path
+    model: Any
+    encoder: str
+    hidden_size: int
     deterministic: bool
     seed: int
-    model: Any = field(init=False)
-    metadata: dict[str, object] = field(init=False)
-    encoder: str = field(init=False)
-    hidden_size: int = field(init=False)
     rng: np.random.Generator = field(init=False)
     states: dict[str, np.ndarray] = field(init=False, default_factory=dict)
 
     def __post_init__(self) -> None:
-        self.model, self.metadata = load_policy_checkpoint(self.checkpoint)
-        if self.metadata.get("environment_id") != "VoyagerIsland-v1":
-            raise ValueError("Checkpoint was not trained for VoyagerIsland-v1.")
-        if self.metadata.get("model_type") != "recurrent_gru":
-            raise ValueError("RecurrentCheckpointIslandPolicy requires a recurrent model.")
-        self.encoder = str(self.metadata["observation_encoder"])
-        self.hidden_size = int(cast(Any, self.metadata["recurrent_hidden_size"]))
         self.rng = np.random.default_rng(self.seed)
 
     def reset(self, possible_agents: tuple[str, ...]) -> None:
@@ -212,6 +204,32 @@ class RecurrentCheckpointIslandPolicy:
                 action = int(self.rng.choice(len(probabilities), p=probabilities))
             actions[agent_id] = action
         return actions
+
+
+class RecurrentCheckpointIslandPolicy(RecurrentModelIslandPolicy):
+    """Load and run a saved shared recurrent PPO actor."""
+
+    def __init__(
+        self,
+        checkpoint: str | Path,
+        *,
+        deterministic: bool,
+        seed: int,
+    ) -> None:
+        model, metadata = load_policy_checkpoint(checkpoint)
+        if metadata.get("environment_id") != "VoyagerIsland-v1":
+            raise ValueError("Checkpoint was not trained for VoyagerIsland-v1.")
+        if metadata.get("model_type") != "recurrent_gru":
+            raise ValueError("RecurrentCheckpointIslandPolicy requires a recurrent model.")
+        self.checkpoint = checkpoint
+        self.metadata = metadata
+        super().__init__(
+            model=model,
+            encoder=str(metadata["observation_encoder"]),
+            hidden_size=int(cast(Any, metadata["recurrent_hidden_size"])),
+            deterministic=deterministic,
+            seed=seed,
+        )
 
 
 def run_island_episode(
@@ -318,6 +336,9 @@ def run_island_episode(
             for agent_id, counts in sorted(action_counts_by_agent.items())
         },
         carrier_diagnostics=carrier,
+        conservation_errors={
+            str(key): int(value) for key, value in env.world.reconcile_v2_ledger().items()
+        },
     )
     env.close()
     return result
@@ -364,6 +385,9 @@ def evaluate_island_policy(
         "mean_final_active_agents": float(
             np.mean([result.final_active_agents for result in results])
         ),
+        "ledger_reconciliation_rate": float(
+            np.mean([not result.conservation_errors for result in results])
+        ),
         "action_counts": dict(sorted(action_counts.items())),
         "carrier_diagnostics": {
             **dict(sorted(carrier_totals.items())),
@@ -395,6 +419,57 @@ def fixed_island_trainability_gate(
         >= _number(random["achievement_geometric_mean"]) + 0.02,
     }
     return {"passed": all(checks.values()), "checks": checks}
+
+
+def evaluate_island_checkpoint(
+    checkpoint: str | Path,
+    *,
+    seeds: Sequence[int],
+    procedural: bool,
+    include_episodes: bool = True,
+) -> dict[str, object]:
+    """Load one checkpoint once and evaluate both canonical inference modes."""
+
+    model, metadata = load_policy_checkpoint(checkpoint)
+    if metadata.get("environment_id") != "VoyagerIsland-v1":
+        raise ValueError("Checkpoint was not trained for VoyagerIsland-v1.")
+    model_type = metadata.get("model_type")
+    encoder = str(metadata["observation_encoder"])
+
+    def factory(deterministic: bool) -> Callable[[int], IslandPolicy]:
+        if model_type == "feed_forward":
+            return lambda seed: FeedForwardModelIslandPolicy(
+                model,
+                encoder,
+                deterministic=deterministic,
+                seed=seed,
+            )
+        if model_type == "recurrent_gru":
+            hidden_size = int(cast(Any, metadata["recurrent_hidden_size"]))
+            return lambda seed: RecurrentModelIslandPolicy(
+                model=model,
+                encoder=encoder,
+                hidden_size=hidden_size,
+                deterministic=deterministic,
+                seed=seed,
+            )
+        raise ValueError(f"Unsupported Island checkpoint model_type: {model_type!r}.")
+
+    payload: dict[str, object] = {
+        "checkpoint": str(checkpoint),
+        "checkpoint_metadata": metadata,
+    }
+    for mode, deterministic in (("stochastic", False), ("deterministic", True)):
+        episodes, summary = evaluate_island_policy(
+            factory(deterministic),
+            seeds=seeds,
+            procedural=procedural,
+        )
+        row: dict[str, object] = {"summary": summary}
+        if include_episodes:
+            row["episodes"] = [episode.as_dict() for episode in episodes]
+        payload[mode] = row
+    return payload
 
 
 def island_checkpoint_selection_key(
@@ -441,6 +516,7 @@ def scripted_oracle_solvability_gate(summary: Mapping[str, object]) -> dict[str,
         ),
         "rescue_at_least_90": _number(summary["rescue_rate"]) >= 0.90,
         "invalid_below_5": _number(summary["invalid_action_rate"]) < 0.05,
+        "ledger_reconciles": _number(summary["ledger_reconciliation_rate"]) == 1.0,
     }
     return {"passed": all(checks.values()), "checks": checks}
 

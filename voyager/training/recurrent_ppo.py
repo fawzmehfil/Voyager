@@ -33,6 +33,7 @@ from voyager.training.masking import stack_action_masks
 from voyager.training.model import build_recurrent_actor_critic, require_tensorflow
 from voyager.training.obs import flat_observation_size, flatten_observations
 from voyager.training.ppo import PPOUpdateStats
+from voyager.training.seed_schedule import EpisodeSeedScheduler
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +65,9 @@ class RecurrentPPOConfig:
     map_size: int = 48
     max_steps: int = 600
     procedural: bool = True
+    episode_seed_pool: tuple[int, ...] = ()
+    episode_seed_manifest_hash: str | None = None
+    episode_seed_split: str | None = None
 
     def validate(self) -> None:
         positive_ints = {
@@ -183,8 +187,19 @@ class RecurrentPPOTrainer:
         self.env = training_environment.env
         self.observation_encoder = training_environment.observation_encoder
         self.contract_versions = training_environment.versions
-        self.observations, self.infos = self.env.reset(seed=config.seed)
-        self.reset_count = 1
+        self.seed_scheduler = (
+            EpisodeSeedScheduler(
+                config.episode_seed_pool,
+                config.seed,
+                manifest_hash=config.episode_seed_manifest_hash,
+                split=config.episode_seed_split,
+            )
+            if config.episode_seed_pool
+            else None
+        )
+        self.reset_count = 0
+        self.environment_seed_history: list[int] = []
+        self.observations, self.infos = self.env.reset(seed=self._next_environment_seed())
         self.episode = 0
         first_agent = self.env.possible_agents[0]
         action_space = self.env.action_space(first_agent)
@@ -590,11 +605,19 @@ class RecurrentPPOTrainer:
         }
 
     def _reset_env(self) -> None:
-        seed = self.config.seed + self.reset_count
-        self.observations, self.infos = self.env.reset(seed=seed)
-        self.reset_count += 1
+        self.observations, self.infos = self.env.reset(seed=self._next_environment_seed())
         self.episode += 1
         self.recurrent_states = self._zero_states()
+
+    def _next_environment_seed(self) -> int:
+        seed = (
+            self.seed_scheduler.next_seed()
+            if self.seed_scheduler is not None
+            else self.config.seed + self.reset_count
+        )
+        self.environment_seed_history.append(seed)
+        self.reset_count += 1
+        return seed
 
     def _maybe_save_checkpoint(self, update: int) -> str | None:
         if (
@@ -638,6 +661,10 @@ class RecurrentPPOTrainer:
             "world_steps": self.world_steps,
             "environment_resets": self.reset_count,
             "training_seed": self.config.seed,
+            "training_seed_last": self.environment_seed_history[-1],
+            "environment_seed_schedule": (
+                self.seed_scheduler.metadata() if self.seed_scheduler is not None else None
+            ),
             "learning_rate": self.config.learning_rate,
             "gamma": self.config.gamma,
             "gae_lambda": self.config.gae_lambda,

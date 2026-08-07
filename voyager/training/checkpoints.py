@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,7 @@ def save_policy_checkpoint(
     model.save_weights(str(weights_path))
     full_metadata = dict(metadata)
     full_metadata["weights_file"] = WEIGHTS_FILE
+    full_metadata["weights_sha256"] = _sha256_file(weights_path)
     (path / METADATA_FILE).write_text(
         json.dumps(full_metadata, indent=2, sort_keys=True), encoding="utf-8"
     )
@@ -78,5 +80,17 @@ def load_policy_checkpoint(checkpoint_path: str | Path) -> tuple[Any, dict[str, 
         )
     else:
         raise ValueError(f"Unsupported checkpoint model_type: {model_type!r}.")
-    model.load_weights(str(path / str(metadata["weights_file"])))
+    weights_path = path / str(metadata["weights_file"])
+    expected_hash = metadata.get("weights_sha256")
+    if expected_hash is not None and _sha256_file(weights_path) != expected_hash:
+        raise ValueError(f"Checkpoint weights failed SHA-256 validation: {weights_path}.")
+    model.load_weights(str(weights_path))
     return model, metadata
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
