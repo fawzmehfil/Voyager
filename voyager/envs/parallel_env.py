@@ -37,6 +37,7 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
         mask_role_observation: bool = False,
         scenario_id: str = COMPACT_SCENARIO_ID,
         civilization_version: int = 1,
+        procedural: bool = True,
         render_mode: str | None = None,
     ) -> None:
         if map_size < 9:
@@ -74,6 +75,7 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
             food_spawn_rate=food_spawn_rate,
             scenario_id=scenario_id,
             civilization_version=civilization_version,
+            procedural=procedural,
         )
         self.possible_agents = list(self.world.possible_agents)
         self.agents: list[str] = []
@@ -139,7 +141,10 @@ class VoyagerParallelEnv(gym.Env, ParallelEnv[str, dict[str, np.ndarray], int]):
             for agent_id in acting_agents
         }
 
-        self.agents = [] if max_step_reached else self.world.alive_agents()
+        episode_terminated = bool(terminations) and all(terminations.values())
+        self.agents = (
+            [] if max_step_reached or episode_terminated else self.world.alive_agents()
+        )
         observations = {agent_id: self._observation(agent_id) for agent_id in self.agents}
         return observations, rewards, terminations, truncations, infos
 

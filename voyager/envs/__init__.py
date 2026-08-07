@@ -8,6 +8,7 @@ from voyager.envs.civilization_v2 import (
     CivilizationV2FlattenedActionWrapper,
     VoyagerCivilizationV2Env,
 )
+from voyager.envs.island import VoyagerIslandCentralizedEnv, VoyagerIslandEnv
 from voyager.envs.parallel_env import VoyagerParallelEnv
 from voyager.envs.placeholders import MultiAgentPlaceholderEnv
 from voyager.envs.registration import register_envs
@@ -19,6 +20,8 @@ __all__ = [
     "MultiAgentPlaceholderEnv",
     "VoyagerCivilizationEnv",
     "VoyagerCivilizationV2Env",
+    "VoyagerIslandCentralizedEnv",
+    "VoyagerIslandEnv",
     "VoyagerParallelEnv",
     "VoyagerSingleAgentEnv",
     "register_envs",

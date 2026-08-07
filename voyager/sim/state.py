@@ -180,3 +180,4 @@ class MultiAgentWorldState:
     ground_piles: dict[str, GroundPileState] = field(default_factory=dict)
     ledger: list[dict[str, object]] = field(default_factory=list)
     spoiled_resources: dict[str, int] = field(default_factory=dict)
+    rescue_success: bool = False

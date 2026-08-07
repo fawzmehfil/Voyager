@@ -36,6 +36,20 @@ def register_envs() -> None:
             disable_env_checker=True,
         )
 
+    if "VoyagerIsland-v1" not in registry:
+        register(
+            id="VoyagerIsland-v1",
+            entry_point="voyager.envs.island:VoyagerIslandEnv",
+            order_enforce=False,
+            disable_env_checker=True,
+        )
+
+    if "VoyagerIslandCentralized-v1" not in registry:
+        register(
+            id="VoyagerIslandCentralized-v1",
+            entry_point="voyager.envs.island:VoyagerIslandCentralizedEnv",
+        )
+
     reward_envs = {
         "VoyagerReward-v0": "dense",
         "VoyagerAchievement-v0": "achievement",

@@ -1,0 +1,6 @@
+{
+  "benchmark": "VoyagerIsland-v1",
+  "generator_version": "voyager_island_generator_v1",
+  "split": "train",
+  "seed_range": {"start": 0, "stop_exclusive": 1000, "count": 1000}
+}

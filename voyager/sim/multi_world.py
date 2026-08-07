@@ -23,12 +23,17 @@ from voyager.sim.scenarios import (
     CIVILIZATION_CAMP,
     CIVILIZATION_CAMPFIRE,
     CIVILIZATION_DEER_SPAWNS,
-    CIVILIZATION_SCENARIO_ID,
     CIVILIZATION_SHELTER,
     CIVILIZATION_STALKER_SPAWNS,
     CIVILIZATION_WORKBENCH,
     COMPACT_SCENARIO_ID,
+    ISLAND_BENCHMARK_CAMP,
+    ISLAND_BENCHMARK_RESCUE_DELAY,
+    ISLAND_BENCHMARK_STRUCTURE_SITES,
+    ISLAND_BENCHMARK_STRUCTURE_SPECS,
     build_civilization_island,
+    build_island_benchmark,
+    scenario_definition,
 )
 from voyager.sim.state import (
     AgentState,
@@ -77,6 +82,7 @@ class MultiAgentWorld:
         food_spawn_rate: float = 0.04,
         scenario_id: str = COMPACT_SCENARIO_ID,
         civilization_version: int = 1,
+        procedural: bool = True,
     ) -> None:
         if num_agents < 1:
             raise ValueError("num_agents must be at least 1.")
@@ -91,8 +97,13 @@ class MultiAgentWorld:
         self.food_regen_interval = food_regen_interval
         self.food_spawn_rate = food_spawn_rate
         self.scenario_id = scenario_id
-        self.civilization = scenario_id == CIVILIZATION_SCENARIO_ID
+        self.scenario = scenario_definition(scenario_id)
+        self.civilization = self.scenario.civilization
+        self.island_benchmark = self.scenario.island_benchmark
         self.civilization_version = civilization_version
+        self.procedural = procedural
+        self.deer_spawns: tuple[tuple[int, int], ...] = ()
+        self.stalker_spawns: tuple[tuple[int, int], ...] = ()
         self.possible_agents = [f"agent_{index}" for index in range(num_agents)]
         self.state: MultiAgentWorldState | None = None
         self.rng = np.random.default_rng()
@@ -101,31 +112,49 @@ class MultiAgentWorld:
         """Generate a fresh seeded shared island and spawn all agents."""
 
         self.rng = rng
-        single_state = (
-            build_civilization_island()
-            if self.civilization
-            else generate_island(self.map_size, rng)
-        )
+        if self.island_benchmark:
+            scenario_map = build_island_benchmark(rng, procedural=self.procedural)
+            single_state = scenario_map.state
+            self.deer_spawns = scenario_map.deer_spawns
+            self.stalker_spawns = scenario_map.stalker_spawns
+        elif self.civilization:
+            single_state = build_civilization_island()
+            self.deer_spawns = CIVILIZATION_DEER_SPAWNS
+            self.stalker_spawns = CIVILIZATION_STALKER_SPAWNS
+        else:
+            single_state = generate_island(self.map_size, rng)
+            self.deer_spawns = ()
+            self.stalker_spawns = ()
         if self.civilization and self.map_size != single_state.terrain.shape[0]:
             raise ValueError(
                 f"Civilization vertical slice requires map_size={single_state.terrain.shape[0]}."
             )
         camp_x, camp_y = (
-            CIVILIZATION_CAMP if self.civilization else (single_state.agent.x, single_state.agent.y)
+            ISLAND_BENCHMARK_CAMP
+            if self.island_benchmark
+            else (
+                CIVILIZATION_CAMP
+                if self.civilization
+                else (single_state.agent.x, single_state.agent.y)
+            )
         )
         camp = CampState(
             x=camp_x,
             y=camp_y,
-            shelter_capacity=6 if self.civilization else self.num_agents,
+            shelter_capacity=(2 if self.island_benchmark else 6)
+            if self.civilization
+            else self.num_agents,
         )
-        if self.civilization:
+        if self.civilization and not self.island_benchmark:
             camp.stockpile["food"] = self.num_agents
             camp.stockpile.update({"raw_meat": 0, "cooked_meat": 0})
+        elif self.island_benchmark:
+            camp.stockpile.update({"food": 0, "raw_meat": 0, "cooked_meat": 0})
         spawns = self._spawn_positions(single_state.terrain, camp.x, camp.y)
         agents: dict[str, AgentState] = {}
         for index, agent_id in enumerate(self.possible_agents):
             x, y = spawns[index]
-            role = ROLE_NAMES[Role(index % len(Role))]
+            role = "survivor" if self.island_benchmark else ROLE_NAMES[Role(index % len(Role))]
             agent = AgentState(x=x, y=y, role=role)
             if self.civilization:
                 agent.inventory.update({"raw_meat": 0, "cooked_meat": 0})
@@ -135,7 +164,7 @@ class MultiAgentWorld:
         creatures: dict[str, CreatureState] = {}
         if self.civilization:
             structures = self._initial_civilization_structures()
-            for index, (x, y) in enumerate(CIVILIZATION_DEER_SPAWNS):
+            for index, (x, y) in enumerate(self.deer_spawns):
                 creature_id = f"deer_{index}"
                 creatures[creature_id] = CreatureState(
                     id=creature_id,
@@ -156,7 +185,11 @@ class MultiAgentWorld:
             structures=structures,
             creatures=creatures,
         )
-        if self.civilization and self.civilization_version >= 2:
+        if self.island_benchmark:
+            from voyager.sim.island_core import initialize_island_state
+
+            initialize_island_state(self)
+        elif self.civilization and self.civilization_version >= 2:
             self._initialize_v2_state()
         return self.state
 
@@ -166,6 +199,10 @@ class MultiAgentWorld:
     ) -> dict[str, AgentStepResult]:
         """Apply one stable-order simultaneous step for all currently living agents."""
 
+        if self.island_benchmark:
+            from voyager.sim.island_core import step_island
+
+            return step_island(self, actions)
         if self.civilization and self.civilization_version >= 2:
             from voyager.sim.core_v2 import step_civilization_v2
 
@@ -328,6 +365,13 @@ class MultiAgentWorld:
         from voyager.sim.core_v2 import reconcile_ledger
 
         return reconcile_ledger(self)
+
+    def island_action_mask(self, agent_id: str) -> np.ndarray:
+        """Return the compact benchmark's authoritative legal-action mask."""
+
+        from voyager.sim.island_core import action_mask
+
+        return action_mask(self, agent_id)
 
     def alive_agents(self) -> list[str]:
         """Return live agents in stable possible-agent order."""
@@ -615,7 +659,11 @@ class MultiAgentWorld:
         }
         if self.civilization_version < 2:
             return payload
-        payload["version"] = "civilization_global_state_v2"
+        payload["version"] = (
+            "island_benchmark_global_state_v1"
+            if self.island_benchmark
+            else "civilization_global_state_v2"
+        )
         camp = payload["camp"]
         assert isinstance(camp, dict)
         camp.update(
@@ -670,6 +718,21 @@ class MultiAgentWorld:
             for y, x in np.argwhere(state.resource_quantities > 0)
         ]
         payload["conservation"] = self.reconcile_v2_ledger()
+        if self.island_benchmark:
+            from voyager.sim.island_core import island_progress_stage
+
+            beacon_step = state.achievement_steps.get("build_beacon")
+            payload["rescue_success"] = state.rescue_success
+            payload["technology_stage"] = island_progress_stage(state)
+            payload["rescue_ticks_remaining"] = (
+                max(
+                    0,
+                    ISLAND_BENCHMARK_RESCUE_DELAY - (state.step_count - beacon_step),
+                    300 - state.step_count,
+                )
+                if beacon_step is not None
+                else None
+            )
         return payload
 
     @staticmethod
@@ -686,7 +749,24 @@ class MultiAgentWorld:
         }
 
     def _initial_civilization_structures(self) -> dict[str, StructureState]:
-        specs = {
+        if self.island_benchmark:
+            return {
+                structure_id: StructureState(
+                    id=structure_id,
+                    type=structure_id,
+                    x=ISLAND_BENCHMARK_STRUCTURE_SITES[structure_id][0],
+                    y=ISLAND_BENCHMARK_STRUCTURE_SITES[structure_id][1],
+                    required_materials=materials,
+                    required_labor=labor,
+                    capacity=capacity,
+                )
+                for structure_id, (
+                    materials,
+                    labor,
+                    capacity,
+                ) in ISLAND_BENCHMARK_STRUCTURE_SPECS.items()
+            }
+        civilization_specs = {
             "workbench": (CIVILIZATION_WORKBENCH, {"wood": 6, "stone": 2}, 240, 0),
             "campfire": (CIVILIZATION_CAMPFIRE, {"wood": 4, "stone": 4}, 160, 0),
             "shelter": (CIVILIZATION_SHELTER, {"wood": 12, "stone": 6}, 600, 6),
@@ -701,7 +781,7 @@ class MultiAgentWorld:
                 required_labor=labor,
                 capacity=capacity,
             )
-            for structure_id, (position, materials, labor, capacity) in specs.items()
+            for structure_id, (position, materials, labor, capacity) in civilization_specs.items()
         }
 
     def _apply_civilization_action(
@@ -1476,6 +1556,8 @@ class MultiAgentWorld:
             "food_security_steps": state.food_security_steps,
             "max_food_security_steps": state.max_food_security_steps,
             "shelter_completion_step": state.shelter_completion_step,
+            "scenario_id": state.scenario_id,
+            "rescue_success": state.rescue_success,
         }
         if self.civilization_version >= 2:
             from voyager.sim.core_v2 import contribution_metrics
